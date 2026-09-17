@@ -11,8 +11,8 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  const [error, setError] = useState("");
-  const [cargando, setCargando] = useState(false);
+  const [, setError] = useState("");
+  const [, setCargando] = useState(false);
 
   const handleLogin = async (
   e: React.FormEvent<HTMLFormElement>

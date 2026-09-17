@@ -1,6 +1,5 @@
-import { Link, Navigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import "./Administracion.css";
-import { useState } from "react";
 
 interface Usuario {
   id: number;
