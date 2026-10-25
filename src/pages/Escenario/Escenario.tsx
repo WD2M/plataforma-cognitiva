@@ -48,11 +48,120 @@ const escenarios = {
       "Selecciona la respuesta que consideres correcta.",
       "Continúa hasta completar la actividad.",
     ],
-    webglUrl: "http://localhost:8080/secuencia/index.html",
+    webglUrl: "https://1lxldbc3-3000.use2.devtunnels.ms/",
   },
 };
 
+import { useEffect, useRef, useState } from "react";
+import {
+  addDoc,
+  collection,
+  serverTimestamp,
+} from "firebase/firestore";
+
+import { db } from "../../firebase/config";
+import { useAuth } from "../../context/AuthContext";
+
+const ORIGEN_UNITY = "https://wd2m.github.io";
+
+interface ResultadoEscenario {
+  "nombreActualPlayer": string,
+    "nombreHombre": string,
+    "nombreMujer": string,
+    "avatar": number,
+    "colorCarro": number,
+    "isMutedVolumen": false,
+    "musicaVolumen": number,
+    "EfectosVolumen": number,
+    "primeraVezEntrando": boolean,
+    "intentosNivelTutorial": number,
+    "intentosNivel1": number,
+    "intentosNivel2": number,
+    "intentosNivel3": number,
+    "aciertosNivelTutorial": number,
+    "aciertosNivel1": number,
+    "aciertosNivel2": number,
+    "aciertosNivel3": number,
+    "fallosNivelTutorial": number,
+    "fallosNivel1": number,
+    "fallosNivel2": number,
+    "fallosNivel3": number
+}
+
 function Escenario() {
+
+  const { user } = useAuth();
+
+  const [estado, setEstado] = useState("Esperando resultados...");
+  const guardando = useRef(false);
+
+  useEffect(() => {
+    function recibirResultados(event: MessageEvent) {
+      if (event.origin !== ORIGEN_UNITY) return;
+       // Evitar procesar dos veces el mismo envío
+      // mientras se completa la escritura.
+      if (guardando.current) return;
+
+      if (!user) {
+        setEstado("Debes iniciar sesión para guardar resultados.");
+        return;
+      }
+      try {
+        const resultado: ResultadoEscenario =
+          typeof event.data.datos === "string"
+            ? JSON.parse(event.data.datos)
+            : event.data.datos;
+
+        if (
+          typeof resultado.nombreActualPlayer !== "string" ||
+          resultado.nombreActualPlayer.length === 0 ||
+          !Number.isFinite(resultado.fallosNivel1) ||
+          !Number.isFinite(resultado.fallosNivel2) ||
+          !Number.isFinite(resultado.fallosNivel3) ||
+          resultado.fallosNivel2 < 0 ||
+          resultado.fallosNivel3 < 0
+        ) {
+          setEstado("El formato de los resultados no es válido.");
+          return;
+        }
+
+        guardando.current = true;
+        setEstado("Guardando resultados...");
+
+        void addDoc(collection(db, "resultados"), {
+          uid: user.uid,
+          escenarioId: resultado.nombreActualPlayer,
+          puntuacion: resultado.fallosNivel1,
+          tiempoSegundos: resultado.fallosNivel2,
+          errores: resultado.fallosNivel3,
+          creadoEn: serverTimestamp(),
+        })
+          .then(() => {
+            setEstado("Resultados guardados correctamente.");
+          })
+          .catch((error) => {
+            console.error("Error guardando resultados:", error);
+            setEstado("No se pudieron guardar los resultados.");
+          })
+          .finally(() => {
+            guardando.current = false;
+          });
+      } catch (error) {
+        console.error("Mensaje de Unity inválido:", error);
+        setEstado("No se pudieron interpretar los resultados.");
+      }
+    }
+
+    window.addEventListener("message", recibirResultados);
+
+    return () => {
+      window.removeEventListener("message", recibirResultados);
+    };
+  }, [user]);
+
+
+
+
   const { id } = useParams();
   const escenario =
     escenarios[id as unknown as keyof typeof escenarios] ?? escenarios[1];
@@ -65,7 +174,7 @@ function Escenario() {
           <span className="logo-symbol">Ψ</span>
 
           <div>
-            <strong>LAPSUCC</strong>
+            <strong>Increase</strong>
             <small>Laboratorio de Psicología</small>
           </div>
         </Link>
@@ -189,6 +298,7 @@ function Escenario() {
               className="webgl-frame"
               allowFullScreen
             />
+            <p role="status">{estado}</p>
 
           </div>
 
@@ -242,7 +352,7 @@ function Escenario() {
       <footer className="escenario-footer">
 
         <div>
-          <strong>LAPSUCC</strong>
+          <strong>Increase</strong>
           <p>
             Plataforma web de escenarios interactivos
             para el estudio y evaluación de constructos psicológicos.
@@ -250,7 +360,7 @@ function Escenario() {
         </div>
 
         <span>
-          © 2026 LAPSUCC
+          © 2026 Increase
         </span>
 
       </footer>

@@ -52,7 +52,7 @@ function Login() {
 
         <div className="brand">
           <div className="brand-icon">Ψ</div>
-          <span>LAPSUCC</span>
+          <span>Increase</span>
         </div>
 
         <div className="info-content">
@@ -91,7 +91,7 @@ function Login() {
         </div>
 
         <div className="info-footer">
-          © 2026 LAPSUCC · Universidad Católica de Colombia
+          © 2026 Increase
         </div>
 
       </section>
@@ -104,7 +104,7 @@ function Login() {
 
           <div className="mobile-logo">
             <div className="brand-icon">Ψ</div>
-            <span>LAPSUCC</span>
+            <span>Increase</span>
           </div>
 
           <div className="login-header">

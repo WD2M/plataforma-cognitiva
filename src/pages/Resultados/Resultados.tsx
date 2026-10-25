@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import "./Resultados.css";
+import { useAuth } from "../../context/AuthContext";
 
 interface Resultado {
   id: number;
@@ -57,6 +58,7 @@ function Resultados() {
       0
     ) / resultados.length
   );
+  const { perfil } = useAuth();
 
   return (
     <div className="results-page">
@@ -73,7 +75,7 @@ function Resultados() {
             Ψ
           </div>
 
-          <span>LAPSUCC</span>
+          <span>Increase</span>
 
         </Link>
 
@@ -103,18 +105,24 @@ function Resultados() {
           <div className="results-user-info">
 
             <strong>
-              Usuario
+              {perfil
+              ? `${perfil.nombre}`
+              : "Cargando..."}
             </strong>
 
             <span>
-              Participante
+              {perfil
+              ? `${perfil.rol}`
+              : "Cargando..."}
             </span>
 
           </div>
 
-          <div className="results-avatar">
-            U
-          </div>
+          <Link to="/administracion">
+              <div className="home-avatar">
+                {perfil? `${perfil.nombre[0]}` : "Cargando..."}
+              </div>
+          </Link>
 
         </div>
 
@@ -590,13 +598,13 @@ function Resultados() {
           </div>
 
           <span>
-            LAPSUCC
+            Increase
           </span>
 
         </div>
 
         <p>
-          © 2026 LAPSUCC · Universidad Católica de Colombia
+          © 2026 Increase
         </p>
 
       </footer>

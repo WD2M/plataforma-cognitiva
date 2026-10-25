@@ -84,7 +84,7 @@ function Registro() {
 
         <div className="register-brand">
           <div className="register-brand-icon">Ψ</div>
-          <span>LAPSUCC</span>
+          <span>Increase</span>
         </div>
 
         <div className="register-info-content">
@@ -150,7 +150,7 @@ function Registro() {
         </div>
 
         <div className="register-info-footer">
-          © 2026 LAPSUCC · Universidad Católica de Colombia
+          © 2026 Increase
         </div>
 
       </section>
@@ -172,7 +172,7 @@ function Registro() {
               Ψ
             </div>
 
-            <span>LAPSUCC</span>
+            <span>Increase</span>
 
           </div>
 

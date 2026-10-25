@@ -195,6 +195,10 @@
 .catalogo-header h1 {
   margin: 12px 0;
   font-size: 42px;
+  color: #666;
+}
+h1 {
+  color: #070707;
 }
 
 .catalogo-header p {

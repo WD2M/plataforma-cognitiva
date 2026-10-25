@@ -34,7 +34,7 @@ export async function registrarUsuario(
     email: email,
     rol: "participante",
     creadoEn: serverTimestamp(),
-    estado: true,
+    estado: false,
   });  
 
   return user;

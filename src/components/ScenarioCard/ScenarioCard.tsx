@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-
+import "./ScanarioCard.css";
 interface Scenario {
   id: string;
   title: string;
@@ -21,6 +21,7 @@ function ScenarioCard({ scenario }: ScenarioCardProps) {
         <img
           src={scenario.image}
           alt={scenario.title}
+          
         />
 
         <span className="scenario-category">

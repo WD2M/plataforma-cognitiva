@@ -1,0 +1,443 @@
+.perfil-page {
+  min-height: 100vh;
+  background: #f7f7fb;
+  color: #202033;
+}
+
+/* =========================
+   NAVBAR
+========================= */
+
+.perfil-navbar {
+  height: 72px;
+  padding: 0 7%;
+  background: white;
+  border-bottom: 1px solid #e9e9ef;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.perfil-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.perfil-brand-icon {
+  width: 38px;
+  height: 38px;
+
+  border-radius: 10px;
+
+  background: #6366f1;
+  color: white;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.perfil-brand strong {
+  display: block;
+  font-size: 15px;
+}
+
+.perfil-brand span {
+  display: block;
+  font-size: 11px;
+  color: #858598;
+}
+
+.perfil-navbar nav {
+  display: flex;
+  gap: 8px;
+}
+
+.perfil-navbar nav button {
+  border: none;
+  background: transparent;
+
+  padding: 9px 15px;
+
+  border-radius: 8px;
+
+  color: #6d6d80;
+
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.perfil-navbar nav button:hover {
+  background: #f1f1f7;
+}
+
+.perfil-navbar .perfil-nav-active {
+  background: #eeeeff;
+  color: #6366f1;
+  font-weight: 600;
+}
+
+
+/* =========================
+   CONTENEDOR
+========================= */
+
+.perfil-container {
+  width: min(1000px, 90%);
+  margin: 0 auto;
+  padding: 50px 0;
+}
+
+.perfil-heading {
+  margin-bottom: 30px;
+}
+
+.perfil-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #6366f1;
+}
+
+.perfil-heading h1 {
+  margin: 8px 0;
+
+  font-size: 34px;
+  letter-spacing: -0.5px;
+}
+
+.perfil-heading p {
+  margin: 0;
+  color: #77778a;
+}
+
+
+/* =========================
+   TARJETAS
+========================= */
+
+.perfil-card {
+  background: white;
+
+  border: 1px solid #e8e8ef;
+
+  border-radius: 18px;
+
+  padding: 28px;
+
+  margin-bottom: 20px;
+}
+
+
+/* =========================
+   PERFIL PRINCIPAL
+========================= */
+
+.perfil-user-header {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.perfil-avatar {
+  width: 82px;
+  height: 82px;
+
+  border-radius: 50%;
+
+  background: #6366f1;
+  color: white;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 32px;
+  font-weight: 600;
+}
+
+.perfil-user-name h2 {
+  margin: 0 0 7px;
+  font-size: 24px;
+}
+
+.perfil-user-name p {
+  margin: 8px 0 0;
+
+  color: #858598;
+  font-size: 14px;
+}
+
+.perfil-role {
+  display: inline-block;
+
+  padding: 5px 10px;
+
+  border-radius: 20px;
+
+  background: #eeeeff;
+  color: #6366f1;
+
+  font-size: 12px;
+  font-weight: 600;
+
+  text-transform: capitalize;
+}
+
+
+/* =========================
+   HEADER TARJETAS
+========================= */
+
+.perfil-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+
+  margin-bottom: 25px;
+}
+
+.perfil-card-header h2 {
+  margin: 0 0 5px;
+
+  font-size: 19px;
+}
+
+.perfil-card-header p {
+  margin: 0;
+
+  color: #858598;
+  font-size: 13px;
+}
+
+
+/* =========================
+   INFORMACIÓN
+========================= */
+
+.perfil-info-grid {
+  display: grid;
+
+  grid-template-columns: 1fr 1fr;
+
+  gap: 22px;
+}
+
+.perfil-field label {
+  display: block;
+
+  margin-bottom: 8px;
+
+  color: #77778a;
+
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.perfil-field-value {
+  min-height: 42px;
+
+  display: flex;
+  align-items: center;
+
+  padding: 0 13px;
+
+  border: 1px solid #e5e5ec;
+
+  border-radius: 9px;
+
+  color: #333346;
+
+  font-size: 14px;
+
+  background: #fafafd;
+}
+
+
+/* =========================
+   BOTONES
+========================= */
+
+.perfil-edit-button,
+.perfil-secondary-button {
+  border: none;
+
+  padding: 9px 15px;
+
+  border-radius: 9px;
+
+  background: #eeeeff;
+
+  color: #6366f1;
+
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.perfil-edit-button:hover,
+.perfil-secondary-button:hover {
+  background: #e3e3ff;
+}
+
+
+/* =========================
+   ESTADÍSTICAS
+========================= */
+
+.perfil-stats {
+  display: grid;
+
+  grid-template-columns: repeat(3, 1fr);
+
+  gap: 15px;
+}
+
+.perfil-stat {
+  padding: 18px;
+
+  border-radius: 13px;
+
+  background: #f8f8fc;
+
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.perfil-stat-icon {
+  width: 38px;
+  height: 38px;
+
+  border-radius: 10px;
+
+  background: #eeeeff;
+  color: #6366f1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  font-weight: 700;
+}
+
+.perfil-stat strong {
+  display: block;
+
+  font-size: 20px;
+}
+
+.perfil-stat span:last-child {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #858598;
+
+  font-size: 11px;
+}
+
+
+/* =========================
+   SESIÓN
+========================= */
+
+.perfil-security {
+  display: flex;
+
+  align-items: center;
+  justify-content: space-between;
+}
+
+.perfil-security h2 {
+  margin: 0 0 5px;
+  font-size: 18px;
+}
+
+.perfil-security p {
+  margin: 0;
+
+  color: #858598;
+  font-size: 13px;
+}
+
+.perfil-logout-button {
+  border: 1px solid #f0caca;
+
+  background: #fff6f6;
+
+  color: #c94b4b;
+
+  padding: 10px 17px;
+
+  border-radius: 9px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+}
+
+.perfil-logout-button:hover {
+  background: #ffeded;
+}
+
+
+/* =========================
+   FOOTER
+========================= */
+
+.perfil-footer {
+  padding: 30px;
+
+  text-align: center;
+
+  color: #9292a2;
+
+  font-size: 12px;
+}
+
+
+/* =========================
+   RESPONSIVE
+========================= */
+
+@media (max-width: 700px) {
+
+  .perfil-navbar {
+    padding: 0 20px;
+  }
+
+  .perfil-navbar nav {
+    display: none;
+  }
+
+  .perfil-container {
+    width: 92%;
+    padding: 30px 0;
+  }
+
+  .perfil-info-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .perfil-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .perfil-security {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 20px;
+  }
+
+  .perfil-user-header {
+    align-items: flex-start;
+  }
+
+}

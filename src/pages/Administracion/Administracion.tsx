@@ -78,10 +78,50 @@ const escenarios: Escenario[] = [
 ];
 
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { cerrarSesion } from "../../services/authService";
+
+
+
 
 function Administracion() {
 
   const navigate = useNavigate();
+
+  const [, setError] = useState("");
+  const [, setCargando] = useState(false);
+  const handleLogin = async (
+    e: React.FormEvent<HTMLFormElement>
+  ) => {
+    e.preventDefault();
+  
+    setError("");
+  
+    try {
+      setCargando(true);
+  
+      await cerrarSesion();
+  
+      navigate("/");
+  
+    } catch (error: any) {
+  
+      console.error(error);
+  
+      if (
+        error.code === "auth/invalid-credential"
+      ) {
+        setError("Correo o contraseña incorrectos.");
+      } else {
+        setError("No fue posible iniciar sesión.");
+      }
+  
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  
 
   return (
     <div className="admin-page">
@@ -93,7 +133,7 @@ function Administracion() {
           <div className="admin-logo">Ψ</div>
 
           <div>
-            <strong>LAPSUCC</strong>
+            <strong>Increase</strong>
             <span>Administración</span>
           </div>
         </div>
@@ -143,6 +183,15 @@ function Administracion() {
           <Link to="/" className="back-home">
             ← Volver a la plataforma
           </Link>
+          
+          <form onSubmit={handleLogin}>
+            
+            <button className="exit-button"
+              type="submit">
+                ← Salir de la plataforma
+              </button>
+          </form>
+          
 
         </div>
 

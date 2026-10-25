@@ -5,7 +5,7 @@ import { useAuth } from "../../context/AuthContext";
 
 function Inicio() {
 
-  const { perfil } = useAuth();
+  const { perfil, escenario } = useAuth();
   
   return (
     <div className="home-page">
@@ -21,7 +21,7 @@ function Inicio() {
             Ψ
           </div>
 
-          <span>LAPSUCC</span>
+          <span>Increase</span>
         </Link>
 
 
@@ -52,9 +52,7 @@ function Inicio() {
             </strong>
 
             <span>
-              {perfil
-              ? `${perfil.rol}`
-              : "Cargando..."}
+              {perfil? `${perfil.rol}` : "Cargando..."}
             </span>
           </div>
 
@@ -148,7 +146,7 @@ function Inicio() {
               <span>Escenarios</span>
 
               <strong>
-                12
+                {escenario? `${escenario.count}` : "Cargando..."}
               </strong>
 
             </div>
@@ -358,12 +356,12 @@ function Inicio() {
           </div>
 
           <span>
-            LAPSUCC
+            Increase
           </span>
         </div>
 
         <p>
-          © 2026 LAPSUCC · Universidad Católica de Colombia
+          © 2026 Increase
         </p>
 
       </footer>
