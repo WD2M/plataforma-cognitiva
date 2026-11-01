@@ -1,6 +1,47 @@
 import { useParams, Link } from "react-router-dom";
 import "./Escenario.css";
 
+import { useEffect, useRef, useState } from "react";
+import {
+  addDoc,
+  collection,
+  doc,
+  serverTimestamp,
+  setDoc,
+} from "firebase/firestore";
+
+import { db } from "../../firebase/config";
+import { useAuth } from "../../context/AuthContext";
+
+const ORIGEN_UNITY = "https://wd2m.github.io/PruebaWebGL/";
+
+interface ResultadoEscenario {
+  nombreActualPlayer: string;
+  nombreHombre: string;
+  nombreMujer: string;
+  avatar: number;
+  colorCarro: number;
+  isMutedVolumen: boolean;
+  musicaVolumen: number;
+  EfectosVolumen: number;
+  primeraVezEntrando: boolean;
+  intentosNivelTutorial: number;
+  intentosNivel1: number;
+  intentosNivel2: number;
+  intentosNivel3: number;
+  aciertosNivelTutorial: number;
+  aciertosNivel1: number;
+  aciertosNivel2: number;
+  aciertosNivel3: number;
+  fallosNivelTutorial: number;
+  fallosNivel1: number;
+  fallosNivel2: number;
+  fallosNivel3: number;
+}
+
+
+
+
 const escenarios = {
   1: {
     titulo: "Memoria visual",
@@ -52,41 +93,6 @@ const escenarios = {
   },
 };
 
-import { useEffect, useRef, useState } from "react";
-import {
-  addDoc,
-  collection,
-  serverTimestamp,
-} from "firebase/firestore";
-
-import { db } from "../../firebase/config";
-import { useAuth } from "../../context/AuthContext";
-
-const ORIGEN_UNITY = "https://wd2m.github.io";
-
-interface ResultadoEscenario {
-  "nombreActualPlayer": string,
-    "nombreHombre": string,
-    "nombreMujer": string,
-    "avatar": number,
-    "colorCarro": number,
-    "isMutedVolumen": false,
-    "musicaVolumen": number,
-    "EfectosVolumen": number,
-    "primeraVezEntrando": boolean,
-    "intentosNivelTutorial": number,
-    "intentosNivel1": number,
-    "intentosNivel2": number,
-    "intentosNivel3": number,
-    "aciertosNivelTutorial": number,
-    "aciertosNivel1": number,
-    "aciertosNivel2": number,
-    "aciertosNivel3": number,
-    "fallosNivelTutorial": number,
-    "fallosNivel1": number,
-    "fallosNivel2": number,
-    "fallosNivel3": number
-}
 
 function Escenario() {
 
@@ -96,68 +102,81 @@ function Escenario() {
   const guardando = useRef(false);
 
   useEffect(() => {
-    function recibirResultados(event: MessageEvent) {
-      if (event.origin !== ORIGEN_UNITY) return;
-       // Evitar procesar dos veces el mismo envío
-      // mientras se completa la escritura.
-      if (guardando.current) return;
-
-      if (!user) {
-        setEstado("Debes iniciar sesión para guardar resultados.");
-        return;
-      }
-      try {
-        const resultado: ResultadoEscenario =
-          typeof event.data.datos === "string"
-            ? JSON.parse(event.data.datos)
-            : event.data.datos;
-
+      function recibirResultados(event: MessageEvent) {
+  
+        //if (event.origin !== ORIGEN_UNITY) return;
+  
         if (
-          typeof resultado.nombreActualPlayer !== "string" ||
-          resultado.nombreActualPlayer.length === 0 ||
-          !Number.isFinite(resultado.fallosNivel1) ||
-          !Number.isFinite(resultado.fallosNivel2) ||
-          !Number.isFinite(resultado.fallosNivel3) ||
-          resultado.fallosNivel2 < 0 ||
-          resultado.fallosNivel3 < 0
+          !event.data ||
+          event.data.tipo !== "RESULTADOS_ESCENARIO"
         ) {
-          setEstado("El formato de los resultados no es válido.");
           return;
         }
-
-        guardando.current = true;
-        setEstado("Guardando resultados...");
-
-        void addDoc(collection(db, "resultados"), {
-          uid: user.uid,
-          escenarioId: resultado.nombreActualPlayer,
-          puntuacion: resultado.fallosNivel1,
-          tiempoSegundos: resultado.fallosNivel2,
-          errores: resultado.fallosNivel3,
-          creadoEn: serverTimestamp(),
-        })
-          .then(() => {
-            setEstado("Resultados guardados correctamente.");
+  
+        if (guardando.current) return;
+  
+        if (!user) {
+          setEstado("Debes iniciar sesión para guardar resultados.");
+          return;
+        }
+  
+        try {
+          const resultado: ResultadoEscenario =
+            typeof event.data.datos === "string"
+              ? JSON.parse(event.data.datos)
+              : event.data.datos;
+  
+              console.log("mlp resultado " + resultado.nombreActualPlayer);/// trabajamos aca ojo
+  
+  
+          if (
+            typeof resultado.nombreActualPlayer !== "string" ||
+            resultado.nombreActualPlayer.length === 0 ||
+            !Number.isFinite(resultado.fallosNivel3) ||
+            !Number.isFinite(resultado.fallosNivel2) ||
+            !Number.isFinite(resultado.fallosNivel1) ||
+            resultado.fallosNivel2 < 0 ||
+            resultado.fallosNivel1 < 0
+          ) {
+            setEstado("El formato de los resultados no es válido.");
+            console.log("Fallo toda esta mierda")
+            return;
+          }
+  
+          guardando.current = true;
+          setEstado("Guardando resultados...");
+  
+  
+          
+  
+          void setDoc(doc(db, "resultados", user.uid), {
+            useruid: user.uid,
+            escenarioId: "memoria-001",
+            datos: resultado,
+            creadoEn: serverTimestamp(),
           })
-          .catch((error) => {
-            console.error("Error guardando resultados:", error);
-            setEstado("No se pudieron guardar los resultados.");
-          })
-          .finally(() => {
-            guardando.current = false;
-          });
-      } catch (error) {
-        console.error("Mensaje de Unity inválido:", error);
-        setEstado("No se pudieron interpretar los resultados.");
+            .then(() => {
+              setEstado("Resultados guardados correctamente.");
+            })
+            .catch((error) => {
+              console.error("Error guardando resultados:", error);
+              setEstado("No se pudieron guardar los resultados.");
+            })
+            .finally(() => {
+              guardando.current = false;
+            });
+        } catch (error) {
+          console.error("Mensaje de Unity inválido:", error);
+          setEstado("No se pudieron interpretar los resultados.");
+        }
       }
-    }
-
-    window.addEventListener("message", recibirResultados);
-
-    return () => {
-      window.removeEventListener("message", recibirResultados);
-    };
-  }, [user]);
+  
+      window.addEventListener("message", recibirResultados);
+  
+      return () => {
+        window.removeEventListener("message", recibirResultados);
+      };
+    }, [user]);
 
 
 
@@ -293,14 +312,15 @@ function Escenario() {
           <div className="webgl-container">
 
             <iframe
-              src={escenario.webglUrl}
+              //src={escenario.webglUrl}
+              src="https://wd2m.github.io/PruebaWebGL/JuegoCarro/"
               title={escenario.titulo}
               className="webgl-frame"
               allowFullScreen
             />
-            <p role="status">{estado}</p>
-
+            
           </div>
+          <p role="status">{estado}</p>
 
           <p className="webgl-help">
             El escenario se ejecuta directamente en tu navegador.

@@ -10,7 +10,7 @@ import {
 import { db } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
 
-const ORIGEN_UNITY = "https://1lxldbc3-3000.use2.devtunnels.ms";
+const ORIGEN_UNITY = "https://wd2m.github.io/PruebaWebGL/";
 
 
 interface ResultadoEscenario {
@@ -46,7 +46,7 @@ export default function Escenario() {
   useEffect(() => {
     function recibirResultados(event: MessageEvent) {
 
-      if (event.origin !== ORIGEN_UNITY) return;
+      //if (event.origin !== ORIGEN_UNITY) return;
 
       if (
         !event.data ||
