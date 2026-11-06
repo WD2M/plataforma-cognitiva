@@ -4,7 +4,7 @@ import "./Escenario.css";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import {
-  guardarResultadoEscenario,
+  guardarOActualizarResultadoSesion,
   type DatosUnityEscenario,
 } from "../../services/resultadosService";
 
@@ -72,8 +72,9 @@ function Escenario() {
 
   const [estado, setEstado] = useState("Esperando inicio de la actividad...");
   const guardando = useRef(false);
-  const ultimoGuardadoTimestamp = useRef<number>(0);
+  const sesionDocIdRef = useRef<string | null>(null);
   const ultimoHashPartida = useRef<string>("");
+  const maxJugadasSesionRef = useRef<number>(0);
 
   useEffect(() => {
     function recibirResultados(event: MessageEvent) {
@@ -102,7 +103,7 @@ function Escenario() {
           return;
         }
 
-        // 2. Comprobar si hubo juego real (aciertos o fallos en algún nivel)
+        // 2. Comprobar que existan aciertos o fallos reales (no solo intentos o menús/color de carro)
         const totalAciertos =
           (resultado.aciertosNivelTutorial || 0) +
           (resultado.aciertosNivel1 || 0) +
@@ -115,40 +116,40 @@ function Escenario() {
           (resultado.fallosNivel2 || 0) +
           (resultado.fallosNivel3 || 0);
 
-        const totalIntentos =
-          (resultado.intentosNivelTutorial || 0) +
-          (resultado.intentosNivel1 || 0) +
-          (resultado.intentosNivel2 || 0) +
-          (resultado.intentosNivel3 || 0);
+        const totalEvaluado = totalAciertos + totalFallos;
 
-        // Si todos los contadores de juego son 0, es solo configuración previa (elegir carro, menú, etc.)
-        if (totalAciertos === 0 && totalFallos === 0 && totalIntentos === 0) {
-          console.log("Configuración inicial recibida, aún no hay partida jugada.");
+        // Si no hay ni un solo acierto ni fallo real, se ignora por completo (menús, color de carro, inicio de nivel)
+        if (totalEvaluado === 0) {
           return;
         }
 
-        // 3. Evitar duplicados por mensajes repetidos de la misma partida finalizada
-        const hashPartida = `${resultado.nombreActualPlayer}_${totalAciertos}_${totalFallos}_${totalIntentos}`;
-        const ahora = Date.now();
+        // Si el usuario reinició la partida desde 0 dentro de Unity (los contadores bajaron respecto al máximo de esta sesión),
+        // iniciamos un nuevo documento de informe para la nueva partida
+        if (totalEvaluado < maxJugadasSesionRef.current) {
+          sesionDocIdRef.current = null;
+          maxJugadasSesionRef.current = 0;
+        }
+        maxJugadasSesionRef.current = totalEvaluado;
 
-        if (
-          hashPartida === ultimoHashPartida.current &&
-          ahora - ultimoGuardadoTimestamp.current < 15000
-        ) {
-          console.log("Resultado repetido ya procesado recientemente, ignorando.");
+        // 3. Evitar guardar exactamente el mismo estado si no ha cambiado el marcador
+        const hashEstado = `${resultado.nombreActualPlayer}_${totalAciertos}_${totalFallos}`;
+        if (hashEstado === ultimoHashPartida.current) {
           return;
         }
 
         if (guardando.current) return;
 
         guardando.current = true;
-        setEstado("Guardando resultados finales...");
+        setEstado(
+          `Progreso registrado: ${totalAciertos} aciertos, ${totalFallos} fallos...`
+        );
 
         const nombreUsuario = perfil
           ? `${perfil.nombre} ${perfil.apellido}`.trim()
           : resultado.nombreActualPlayer || "Participante";
 
-        guardarResultadoEscenario(
+        guardarOActualizarResultadoSesion(
+          sesionDocIdRef.current,
           user.uid,
           nombreUsuario,
           user.email || "",
@@ -157,10 +158,12 @@ function Escenario() {
           escenario.categoria,
           resultado
         )
-          .then(() => {
-            ultimoHashPartida.current = hashPartida;
-            ultimoGuardadoTimestamp.current = Date.now();
-            setEstado("¡Resultados guardados exitosamente en tu historial!");
+          .then((docId) => {
+            sesionDocIdRef.current = docId;
+            ultimoHashPartida.current = hashEstado;
+            setEstado(
+              `Informe actualizado (${totalAciertos} aciertos / ${totalFallos} fallos).`
+            );
           })
           .catch((error) => {
             console.error("Error guardando resultados:", error);

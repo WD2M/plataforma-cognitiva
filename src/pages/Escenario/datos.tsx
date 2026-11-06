@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import {
-  guardarResultadoEscenario,
+  guardarOActualizarResultadoSesion,
   type DatosUnityEscenario,
 } from "../../services/resultadosService";
 
@@ -10,8 +10,9 @@ export default function Escenario() {
 
   const [estado, setEstado] = useState("Esperando inicio de la actividad...");
   const guardando = useRef(false);
-  const ultimoGuardadoTimestamp = useRef<number>(0);
+  const sesionDocIdRef = useRef<string | null>(null);
   const ultimoHashPartida = useRef<string>("");
+  const maxJugadasSesionRef = useRef<number>(0);
 
   useEffect(() => {
     function recibirResultados(event: MessageEvent) {
@@ -51,36 +52,34 @@ export default function Escenario() {
           (resultado.fallosNivel2 || 0) +
           (resultado.fallosNivel3 || 0);
 
-        const totalIntentos =
-          (resultado.intentosNivelTutorial || 0) +
-          (resultado.intentosNivel1 || 0) +
-          (resultado.intentosNivel2 || 0) +
-          (resultado.intentosNivel3 || 0);
+        const totalEvaluado = totalAciertos + totalFallos;
 
-        if (totalAciertos === 0 && totalFallos === 0 && totalIntentos === 0) {
+        if (totalEvaluado === 0) {
           return;
         }
 
-        const hashPartida = `${resultado.nombreActualPlayer}_${totalAciertos}_${totalFallos}_${totalIntentos}`;
-        const ahora = Date.now();
+        if (totalEvaluado < maxJugadasSesionRef.current) {
+          sesionDocIdRef.current = null;
+          maxJugadasSesionRef.current = 0;
+        }
+        maxJugadasSesionRef.current = totalEvaluado;
 
-        if (
-          hashPartida === ultimoHashPartida.current &&
-          ahora - ultimoGuardadoTimestamp.current < 15000
-        ) {
+        const hashEstado = `${resultado.nombreActualPlayer}_${totalAciertos}_${totalFallos}`;
+        if (hashEstado === ultimoHashPartida.current) {
           return;
         }
 
         if (guardando.current) return;
 
         guardando.current = true;
-        setEstado("Guardando resultados...");
+        setEstado("Actualizando informe de la partida...");
 
         const nombreUsuario = perfil
           ? `${perfil.nombre} ${perfil.apellido}`.trim()
           : resultado.nombreActualPlayer || "Participante";
 
-        guardarResultadoEscenario(
+        guardarOActualizarResultadoSesion(
+          sesionDocIdRef.current,
           user.uid,
           nombreUsuario,
           user.email || "",
@@ -89,10 +88,12 @@ export default function Escenario() {
           "Memoria",
           resultado
         )
-          .then(() => {
-            ultimoHashPartida.current = hashPartida;
-            ultimoGuardadoTimestamp.current = Date.now();
-            setEstado("Resultados guardados correctamente.");
+          .then((docId) => {
+            sesionDocIdRef.current = docId;
+            ultimoHashPartida.current = hashEstado;
+            setEstado(
+              `Informe actualizado (${totalAciertos} aciertos / ${totalFallos} fallos).`
+            );
           })
           .catch((error) => {
             console.error("Error guardando resultados:", error);
