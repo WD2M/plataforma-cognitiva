@@ -55,12 +55,18 @@ export default function Escenario() {
         const totalEvaluado = totalAciertos + totalFallos;
 
         if (totalEvaluado === 0) {
+          if (maxJugadasSesionRef.current > 0) {
+            sesionDocIdRef.current = null;
+            maxJugadasSesionRef.current = 0;
+            ultimoHashPartida.current = "";
+          }
           return;
         }
 
         if (totalEvaluado < maxJugadasSesionRef.current) {
           sesionDocIdRef.current = null;
           maxJugadasSesionRef.current = 0;
+          ultimoHashPartida.current = "";
         }
         maxJugadasSesionRef.current = totalEvaluado;
 

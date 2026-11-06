@@ -201,52 +201,8 @@ function normalizarDocumento(id: string, raw: Record<string, any>): RegistroResu
   };
 }
 
-// Consolida registros fragmentados de una misma sesión (cuando se guardaban por cada acierto/fallo)
-// Si dos registros del mismo usuario y escenario ocurrieron con menos de 10 minutos de diferencia
-// y uno es la continuación incremental del otro, nos quedamos únicamente con el reporte final consolidado.
-function consolidarSesionesFragmentadas(
-  lista: RegistroResultado[]
-): RegistroResultado[] {
-  // Asegurar orden del más reciente al más antiguo
-  const ordenados = [...lista].sort((a, b) => {
-    const fechaA = (a.creadoEn as Timestamp)?.toMillis?.() || 0;
-    const fechaB = (b.creadoEn as Timestamp)?.toMillis?.() || 0;
-    return fechaB - fechaA;
-  });
-
-  const resultadoConsolidado: RegistroResultado[] = [];
-
-  for (const actual of ordenados) {
-    const ultimoAceptado = resultadoConsolidado[resultadoConsolidado.length - 1];
-
-    if (
-      ultimoAceptado &&
-      ultimoAceptado.userUid === actual.userUid &&
-      ultimoAceptado.escenarioId === actual.escenarioId
-    ) {
-      const tUltimo = (ultimoAceptado.creadoEn as Timestamp)?.toMillis?.() || 0;
-      const tActual = (actual.creadoEn as Timestamp)?.toMillis?.() || 0;
-      const diferenciaMinutos = Math.abs(tUltimo - tActual) / (1000 * 60);
-
-      // Si pertenecen a la misma sesión de juego (< 12 minutos entre eventos de la misma partida)
-      // y el registro más reciente tiene igual o más jugadas acumuladas que el evento intermedio anterior
-      const jugadasUltimo =
-        ultimoAceptado.aciertosTotales + ultimoAceptado.fallosTotales;
-      const jugadasActual = actual.aciertosTotales + actual.fallosTotales;
-
-      if (diferenciaMinutos <= 12 && jugadasUltimo >= jugadasActual) {
-        // Ignoramos este registro intermedio porque ya está incluido en el informe final de esa sesión (`ultimoAceptado`)
-        continue;
-      }
-    }
-
-    resultadoConsolidado.push(actual);
-  }
-
-  return resultadoConsolidado;
-}
-
-// Limpiar registros con 0 aciertos y 0 fallos o fragmentados de un usuario en la BD (en segundo plano)
+// Limpiar únicamente registros basura con 0 aciertos y 0 fallos (como cambios de color de carro o menús)
+// NUNCA borra partidas que sí tengan al menos 1 acierto o 1 fallo.
 export async function limpiarRegistrosBasuraUsuario(userUid: string): Promise<void> {
   try {
     const q = query(
@@ -256,27 +212,11 @@ export async function limpiarRegistrosBasuraUsuario(userUid: string): Promise<vo
     const snap = await getDocs(q);
     const promesasBorrado: Promise<void>[] = [];
 
-    const validos: { docId: string; item: RegistroResultado }[] = [];
-
     for (const d of snap.docs) {
       const normalizado = normalizarDocumento(d.id, d.data());
       if (!normalizado) {
-        // Es un registro basura (0 aciertos y 0 fallos) -> se elimina de Firestore
+        // Solo si tiene 0 aciertos y 0 fallos se elimina de Firestore
         promesasBorrado.push(deleteDoc(doc(db, "resultados", d.id)));
-      } else {
-        validos.push({ docId: d.id, item: normalizado });
-      }
-    }
-
-    // También detectar registros intermedios fragmentados de una misma sesión y eliminarlos de Firestore
-    const consolidados = consolidarSesionesFragmentadas(
-      validos.map((v) => v.item)
-    );
-    const idsConservados = new Set(consolidados.map((c) => c.id));
-
-    for (const v of validos) {
-      if (!idsConservados.has(v.docId)) {
-        promesasBorrado.push(deleteDoc(doc(db, "resultados", v.docId)));
       }
     }
 
@@ -284,16 +224,16 @@ export async function limpiarRegistrosBasuraUsuario(userUid: string): Promise<vo
       await Promise.all(promesasBorrado);
     }
   } catch (e) {
-    console.warn("No se pudieron limpiar registros vacíos/fragmentados:", e);
+    console.warn("No se pudieron limpiar registros vacíos:", e);
   }
 }
 
-// Obtener historial de resultados de un usuario
+// Obtener historial de resultados de un usuario (conservando todas las partidas jugadas)
 export async function obtenerResultadosUsuario(
   userUid: string
 ): Promise<RegistroResultado[]> {
   try {
-    // Limpieza rápida de registros en 0 (color de carro, menús, etc.)
+    // Limpieza rápida solo de registros en 0 (color de carro, menús, etc.)
     await limpiarRegistrosBasuraUsuario(userUid);
 
     const q = query(
@@ -302,11 +242,9 @@ export async function obtenerResultadosUsuario(
       orderBy("creadoEn", "desc")
     );
     const snap = await getDocs(q);
-    const validos = snap.docs
+    return snap.docs
       .map((docSnap) => normalizarDocumento(docSnap.id, docSnap.data()))
       .filter((item): item is RegistroResultado => item !== null);
-
-    return consolidarSesionesFragmentadas(validos);
   } catch (error) {
     console.warn("Fallo con orderBy, ordenando localmente:", error);
     const fallbackQ = query(
@@ -318,7 +256,11 @@ export async function obtenerResultadosUsuario(
       .map((docSnap) => normalizarDocumento(docSnap.id, docSnap.data()))
       .filter((item): item is RegistroResultado => item !== null);
 
-    return consolidarSesionesFragmentadas(validos);
+    return validos.sort((a, b) => {
+      const fechaA = (a.creadoEn as Timestamp)?.toMillis?.() || 0;
+      const fechaB = (b.creadoEn as Timestamp)?.toMillis?.() || 0;
+      return fechaB - fechaA;
+    });
   }
 }
 
@@ -327,11 +269,9 @@ export async function obtenerTodosLosResultados(): Promise<RegistroResultado[]> 
   try {
     const q = query(collection(db, "resultados"), orderBy("creadoEn", "desc"));
     const snap = await getDocs(q);
-    const validos = snap.docs
+    return snap.docs
       .map((docSnap) => normalizarDocumento(docSnap.id, docSnap.data()))
       .filter((item): item is RegistroResultado => item !== null);
-
-    return consolidarSesionesFragmentadas(validos);
   } catch (error) {
     console.warn("Fallo con orderBy general, fallback sin ordenar:", error);
     const snap = await getDocs(collection(db, "resultados"));
@@ -339,6 +279,10 @@ export async function obtenerTodosLosResultados(): Promise<RegistroResultado[]> 
       .map((docSnap) => normalizarDocumento(docSnap.id, docSnap.data()))
       .filter((item): item is RegistroResultado => item !== null);
 
-    return consolidarSesionesFragmentadas(validos);
+    return validos.sort((a, b) => {
+      const fechaA = (a.creadoEn as Timestamp)?.toMillis?.() || 0;
+      const fechaB = (b.creadoEn as Timestamp)?.toMillis?.() || 0;
+      return fechaB - fechaA;
+    });
   }
 }

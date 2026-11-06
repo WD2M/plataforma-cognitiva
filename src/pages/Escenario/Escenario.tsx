@@ -118,8 +118,14 @@ function Escenario() {
 
         const totalEvaluado = totalAciertos + totalFallos;
 
-        // Si no hay ni un solo acierto ni fallo real, se ignora por completo (menús, color de carro, inicio de nivel)
+        // Si no hay ni un solo acierto ni fallo real, es menú inicial / cambio de color de carro.
+        // Si veníamos de una partida anterior en la misma pestaña, reseteamos la referencia para que la nueva partida cree un nuevo informe en el historial.
         if (totalEvaluado === 0) {
+          if (maxJugadasSesionRef.current > 0) {
+            sesionDocIdRef.current = null;
+            maxJugadasSesionRef.current = 0;
+            ultimoHashPartida.current = "";
+          }
           return;
         }
 
@@ -128,6 +134,7 @@ function Escenario() {
         if (totalEvaluado < maxJugadasSesionRef.current) {
           sesionDocIdRef.current = null;
           maxJugadasSesionRef.current = 0;
+          ultimoHashPartida.current = "";
         }
         maxJugadasSesionRef.current = totalEvaluado;
 
