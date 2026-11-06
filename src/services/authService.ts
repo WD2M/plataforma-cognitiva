@@ -17,6 +17,7 @@ export async function registrarUsuario(
   apellido: string,
   email: string,
   password: string,
+  documento: string = "",
 ) {
 
 
@@ -31,6 +32,7 @@ export async function registrarUsuario(
   await setDoc(doc(db, "users", user.uid), {
     nombre: nombre,
     apellido: apellido,
+    documento: documento.trim(),
     email: email,
     rol: "participante",
     creadoEn: serverTimestamp(),

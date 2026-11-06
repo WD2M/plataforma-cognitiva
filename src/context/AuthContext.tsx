@@ -11,12 +11,13 @@ import { collection, doc, getCountFromServer, getDoc } from "firebase/firestore"
 
 import { auth, db } from "../firebase/config";
 
-interface PerfilUsuario {
+export interface PerfilUsuario {
   nombre: string;
   apellido: string;
   email: string;
   rol: string;
   estado: boolean;
+  documento?: string;
 }
 interface Escenarios{
   count: 0

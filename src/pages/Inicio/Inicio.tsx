@@ -6,6 +6,7 @@ import { useAuth } from "../../context/AuthContext";
 function Inicio() {
 
   const { perfil, escenario } = useAuth();
+  const esAdmin = perfil?.rol?.toLowerCase() === "administrador";
   
   return (
     <div className="home-page">
@@ -31,13 +32,26 @@ function Inicio() {
             Inicio
           </Link>
 
-          <Link to="/catalogo">
-            Escenarios
-          </Link>
+          {esAdmin ? (
+            <>
+              <Link to="/administracion">
+                Panel Admin
+              </Link>
+              <Link to="/perfil">
+                Monitoreo de Pacientes
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link to="/catalogo">
+                Escenarios
+              </Link>
 
-          <Link to="/resultados">
-            Mi progreso
-          </Link>
+              <Link to="/resultados">
+                Mi progreso
+              </Link>
+            </>
+          )}
 
         </nav>
 
@@ -57,7 +71,7 @@ function Inicio() {
           </div>
 
           
-          <Link to="/administracion">
+          <Link to={esAdmin ? "/administracion" : "/perfil"}>
               <div className="home-avatar">
                 {perfil? `${perfil.nombre[0]}` : "Cargando..."}
               </div>
@@ -98,20 +112,41 @@ function Inicio() {
 
             <div className="hero-buttons">
 
-              <Link
-                to="/catalogo"
-                className="primary-button"
-              >
-                Explorar escenarios
-                <span>→</span>
-              </Link>
+              {esAdmin ? (
+                <>
+                  <Link
+                    to="/perfil"
+                    className="primary-button"
+                  >
+                    Monitorear pacientes
+                    <span>→</span>
+                  </Link>
 
-              <Link
-                to="/resultados"
-                className="secondary-button"
-              >
-                Ver mi progreso
-              </Link>
+                  <Link
+                    to="/administracion"
+                    className="secondary-button"
+                  >
+                    Panel de administración
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <Link
+                    to="/catalogo"
+                    className="primary-button"
+                  >
+                    Explorar escenarios
+                    <span>→</span>
+                  </Link>
+
+                  <Link
+                    to="/resultados"
+                    className="secondary-button"
+                  >
+                    Ver mi progreso
+                  </Link>
+                </>
+              )}
 
             </div>
 
@@ -202,10 +237,10 @@ function Inicio() {
           <div className="quick-grid">
 
 
-            {/* Escenarios */}
+            {/* Escenarios / Administración */}
 
             <Link
-              to="/catalogo"
+              to={esAdmin ? "/administracion" : "/catalogo"}
               className="quick-card"
             >
 
@@ -216,12 +251,13 @@ function Inicio() {
               <div>
 
                 <h3>
-                  Explorar escenarios
+                  {esAdmin ? "Panel Administrativo" : "Explorar escenarios"}
                 </h3>
 
                 <p>
-                  Descubre las actividades interactivas
-                  disponibles.
+                  {esAdmin
+                    ? "Supervisa métricas, escenarios y actividad global."
+                    : "Descubre las actividades interactivas disponibles."}
                 </p>
 
               </div>
@@ -233,10 +269,10 @@ function Inicio() {
             </Link>
 
 
-            {/* Progreso */}
+            {/* Progreso / Pacientes */}
 
             <Link
-              to="/resultados"
+              to={esAdmin ? "/perfil" : "/resultados"}
               className="quick-card"
             >
 
@@ -247,11 +283,13 @@ function Inicio() {
               <div>
 
                 <h3>
-                  Consultar progreso
+                  {esAdmin ? "Buscar pacientes y resultados" : "Consultar progreso"}
                 </h3>
 
                 <p>
-                  Revisa tus resultados y desempeño.
+                  {esAdmin
+                    ? "Busca por nombre o documento e inspecciona sus informes."
+                    : "Revisa tus resultados y desempeño."}
                 </p>
 
               </div>
@@ -277,11 +315,13 @@ function Inicio() {
               <div>
 
                 <h3>
-                  Mi perfil
+                  {esAdmin ? "Perfil de Supervisor" : "Mi perfil"}
                 </h3>
 
                 <p>
-                  Administra la información de tu cuenta.
+                  {esAdmin
+                    ? "Gestiona tu cuenta e historial de supervisión."
+                    : "Administra la información de tu cuenta."}
                 </p>
 
               </div>

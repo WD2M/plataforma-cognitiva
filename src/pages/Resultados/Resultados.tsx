@@ -4,6 +4,7 @@ import "./Resultados.css";
 import { useAuth } from "../../context/AuthContext";
 import {
   obtenerResultadosUsuario,
+  obtenerTodosLosResultados,
   type RegistroResultado,
 } from "../../services/resultadosService";
 import type { Timestamp } from "firebase/firestore";
@@ -25,6 +26,7 @@ function formatearFecha(fecha: unknown): string {
 
 function Resultados() {
   const { user, perfil } = useAuth();
+  const esAdmin = perfil?.rol?.toLowerCase() === "administrador";
   const [resultados, setResultados] = useState<RegistroResultado[]>([]);
   const [cargando, setCargando] = useState(true);
 
@@ -38,7 +40,9 @@ function Resultados() {
       }
 
       try {
-        const datos = await obtenerResultadosUsuario(user.uid);
+        const datos = esAdmin
+          ? await obtenerTodosLosResultados()
+          : await obtenerResultadosUsuario(user.uid);
         if (activo) {
           setResultados(datos);
         }
@@ -56,7 +60,7 @@ function Resultados() {
     return () => {
       activo = false;
     };
-  }, [user]);
+  }, [user, esAdmin]);
 
   const total = resultados.length;
   const promedio =
@@ -137,7 +141,7 @@ function Resultados() {
 
           </div>
 
-          <Link to="/administracion">
+          <Link to={esAdmin ? "/administracion" : "/perfil"}>
               <div className="home-avatar">
                 {perfil? `${perfil.nombre[0]}` : "Cargando..."}
               </div>
@@ -161,26 +165,27 @@ function Resultados() {
           <div>
 
             <span className="results-label">
-              MI PROGRESO
+              {esAdmin ? "MONITOREO GENERAL" : "MI PROGRESO"}
             </span>
 
             <h1>
-              Resultados y desempeño
+              {esAdmin ? "Resultados globales de participantes" : "Resultados y desempeño"}
             </h1>
 
             <p>
-              Consulta el historial de tus actividades
-              y observa cómo ha evolucionado tu desempeño.
+              {esAdmin
+                ? "Supervisa el historial consolidado de evaluaciones realizadas en la plataforma."
+                : "Consulta el historial de tus actividades y observa cómo ha evolucionado tu desempeño."}
             </p>
 
           </div>
 
 
           <Link
-            to="/catalogo"
+            to={esAdmin ? "/perfil" : "/catalogo"}
             className="results-action"
           >
-            Realizar escenario
+            {esAdmin ? "Buscar paciente por nombre / documento" : "Realizar escenario"}
             <span>→</span>
           </Link>
 
@@ -480,7 +485,16 @@ function Resultados() {
                 <div className="history-row" key={resultado.id}>
                   <div className="scenario-name">
                     <div className="scenario-icon">◈</div>
-                    <strong>{resultado.escenarioTitulo || "Escenario"}</strong>
+                    <div>
+                      <strong style={{ display: "block" }}>
+                        {resultado.escenarioTitulo || "Escenario"}
+                      </strong>
+                      {esAdmin && (
+                        <small style={{ color: "#6366f1", fontSize: "11px" }}>
+                          Paciente: {resultado.usuarioNombre || "Participante"}
+                        </small>
+                      )}
+                    </div>
                   </div>
 
                   <span className="category">{resultado.categoria || "General"}</span>

@@ -33,6 +33,7 @@ function FormularioInicial() {
   const { user } = useAuth();
   //const navigate = useNavigate();
 
+  const [documento, setDocumento] = useState("");
   const [edad, setEdad] = useState("");
   const [genero, setGenero] = useState("");
   const [escolaridad, setEscolaridad] = useState("");
@@ -88,6 +89,7 @@ function FormularioInicial() {
 
       lote.set(referenciaCaracterizacion, {
         usuarioId: user.uid,
+        documento: documento.trim(),
         edad: Number(edad),
         genero,
         escolaridad,
@@ -103,9 +105,13 @@ function FormularioInicial() {
         fechaActualizacion: serverTimestamp(),
       });
 
-      lote.update(referenciaUsuario, {
+      const datosUpdateUsuario: Record<string, any> = {
         estado: true,
-      });
+      };
+      if (documento.trim()) {
+        datosUpdateUsuario.documento = documento.trim();
+      }
+      lote.update(referenciaUsuario, datosUpdateUsuario);
 
       await lote.commit();
 
@@ -146,6 +152,17 @@ function FormularioInicial() {
           </p>
 
           <div className="formulario-grid">
+            <label>
+              Número de documento
+              <input
+                type="text"
+                placeholder="Ej. 1002345678"
+                value={documento}
+                onChange={(e) => setDocumento(e.target.value)}
+                required
+              />
+            </label>
+
             <label>
               Edad
               <input

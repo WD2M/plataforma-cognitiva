@@ -286,3 +286,110 @@ export async function obtenerTodosLosResultados(): Promise<RegistroResultado[]> 
     });
   }
 }
+
+export interface PacienteMonitoreo {
+  uid: string;
+  nombre: string;
+  apellido: string;
+  nombreCompleto: string;
+  documento: string;
+  email: string;
+  rol: string;
+  estado: boolean;
+  edad?: number;
+  genero?: string;
+  escolaridad?: string;
+  ciudad?: string;
+  ocupacionActual?: string;
+  diagnosticoDificultad?: string;
+  objetivos?: string[];
+  resultados: RegistroResultado[];
+  totalPartidas: number;
+  promedioDesempeno: number;
+  aciertosAcumulados: number;
+  fallosAcumulados: number;
+  ultimaFecha: Timestamp | Date | null;
+}
+
+// Obtener directorio completo de pacientes/participantes junto con su caracterización y todos sus resultados detallados
+export async function obtenerPacientesConResultados(): Promise<PacienteMonitoreo[]> {
+  const [usersSnap, caractSnap, todosResultados] = await Promise.all([
+    getDocs(collection(db, "users")),
+    getDocs(collection(db, "caracterizaciones")),
+    obtenerTodosLosResultados(),
+  ]);
+
+  const caractMap: Record<string, Record<string, any>> = {};
+  for (const cDoc of caractSnap.docs) {
+    const data = cDoc.data();
+    const uid = data.usuarioId || cDoc.id;
+    caractMap[uid] = data;
+  }
+
+  const resultadosPorUid: Record<string, RegistroResultado[]> = {};
+  for (const r of todosResultados) {
+    if (!resultadosPorUid[r.userUid]) {
+      resultadosPorUid[r.userUid] = [];
+    }
+    resultadosPorUid[r.userUid].push(r);
+  }
+
+  const listaPacientes: PacienteMonitoreo[] = [];
+
+  for (const uDoc of usersSnap.docs) {
+    const data = uDoc.data();
+    const uid = uDoc.id;
+    const caract = caractMap[uid] || {};
+    const misResultados = resultadosPorUid[uid] || [];
+
+    const nombre = data.nombre || "";
+    const apellido = data.apellido || "";
+    const nombreCompleto = `${nombre} ${apellido}`.trim() || "Participante";
+    const documento =
+      String(data.documento || caract.documento || "").trim() || "Sin registrar";
+
+    const totalPartidas = misResultados.length;
+    const promedioDesempeno =
+      totalPartidas > 0
+        ? Math.round(
+            misResultados.reduce((acc, item) => acc + item.puntuacion, 0) /
+              totalPartidas
+          )
+        : 0;
+
+    const aciertosAcumulados = misResultados.reduce(
+      (acc, item) => acc + item.aciertosTotales,
+      0
+    );
+    const fallosAcumulados = misResultados.reduce(
+      (acc, item) => acc + item.fallosTotales,
+      0
+    );
+
+    listaPacientes.push({
+      uid,
+      nombre,
+      apellido,
+      nombreCompleto,
+      documento,
+      email: data.email || "—",
+      rol: data.rol || "participante",
+      estado: Boolean(data.estado),
+      edad: caract.edad,
+      genero: caract.genero,
+      escolaridad: caract.escolaridad,
+      ciudad: caract.ciudad,
+      ocupacionActual: caract.ocupacionActual,
+      diagnosticoDificultad: caract.diagnosticoDificultad,
+      objetivos: caract.objetivos,
+      resultados: misResultados,
+      totalPartidas,
+      promedioDesempeno,
+      aciertosAcumulados,
+      fallosAcumulados,
+      ultimaFecha: misResultados[0]?.creadoEn || data.creadoEn || null,
+    });
+  }
+
+  return listaPacientes;
+}
