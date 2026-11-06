@@ -1,121 +1,150 @@
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import "./Administracion.css";
+import { cerrarSesion } from "../../services/authService";
+import {
+  obtenerTodosLosResultados,
+  type RegistroResultado,
+} from "../../services/resultadosService";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../firebase/config";
+import type { Timestamp } from "firebase/firestore";
 
-interface Usuario {
-  id: number;
+interface UsuarioItem {
+  id: string;
   nombre: string;
   correo: string;
   rol: string;
-  estado: "Activo" | "Inactivo";
-  fecha: string;
+  estado: string;
 }
 
-interface Escenario {
-  id: number;
+interface EscenarioItem {
+  id: string;
   nombre: string;
   categoria: string;
   participantes: number;
-  estado: "Activo" | "Inactivo";
+  estado: string;
 }
 
-const usuarios: Usuario[] = [
-  {
-    id: 1,
-    nombre: "María González",
-    correo: "maria.gonzalez@email.com",
-    rol: "Participante",
-    estado: "Activo",
-    fecha: "12 Sep 2026",
-  },
-  {
-    id: 2,
-    nombre: "Carlos Rodríguez",
-    correo: "carlos.rodriguez@email.com",
-    rol: "Participante",
-    estado: "Activo",
-    fecha: "11 Sep 2026",
-  },
-  {
-    id: 3,
-    nombre: "Laura Martínez",
-    correo: "laura.martinez@email.com",
-    rol: "Investigador",
-    estado: "Activo",
-    fecha: "08 Sep 2026",
-  },
-  {
-    id: 4,
-    nombre: "Andrés Pérez",
-    correo: "andres.perez@email.com",
-    rol: "Participante",
-    estado: "Inactivo",
-    fecha: "05 Sep 2026",
-  },
-];
-
-const escenarios: Escenario[] = [
-  {
-    id: 1,
-    nombre: "Memoria visual",
-    categoria: "Memoria",
-    participantes: 128,
-    estado: "Activo",
-  },
-  {
-    id: 2,
-    nombre: "Atención selectiva",
-    categoria: "Atención",
-    participantes: 94,
-    estado: "Activo",
-  },
-  {
-    id: 3,
-    nombre: "Secuencia lógica",
-    categoria: "Funciones ejecutivas",
-    participantes: 76,
-    estado: "Activo",
-  },
-];
-
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
-import { cerrarSesion } from "../../services/authService";
-
-
-
+function formatearFechaHora(fecha: unknown): string {
+  if (!fecha) return "—";
+  try {
+    const timestamp = fecha as Timestamp;
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(fecha as any);
+    return date.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
+}
 
 function Administracion() {
-
   const navigate = useNavigate();
 
   const [, setError] = useState("");
   const [, setCargando] = useState(false);
-  const handleLogin = async (
-    e: React.FormEvent<HTMLFormElement>
-  ) => {
+
+  // Estados de datos reales
+  const [resultados, setResultados] = useState<RegistroResultado[]>([]);
+  const [usuarios, setUsuarios] = useState<UsuarioItem[]>([]);
+  const [escenarios, setEscenarios] = useState<EscenarioItem[]>([]);
+  const [cargandoDatos, setCargandoDatos] = useState(true);
+
+  useEffect(() => {
+    let activo = true;
+
+    async function cargarInformacionAdmin() {
+      try {
+        // 1. Obtener resultados de evaluaciones
+        const listaResultados = await obtenerTodosLosResultados();
+
+        // 2. Obtener usuarios registrados
+        const usersSnap = await getDocs(collection(db, "users"));
+        const listaUsuarios: UsuarioItem[] = usersSnap.docs.map((docSnap) => {
+          const d = docSnap.data();
+          return {
+            id: docSnap.id,
+            nombre: `${d.nombre || ""} ${d.apellido || ""}`.trim() || "Usuario",
+            correo: d.email || "—",
+            rol: d.rol || "Participante",
+            estado: d.estado ? "Activo" : "Registrado",
+          };
+        });
+
+        // 3. Obtener escenarios
+        const escenariosSnap = await getDocs(collection(db, "escenarios"));
+        const listaEscenarios: EscenarioItem[] = escenariosSnap.docs.map(
+          (docSnap) => {
+            const d = docSnap.data();
+            const totalParticipantes = listaResultados.filter(
+              (r) => r.escenarioId === docSnap.id || r.escenarioTitulo === d.titulo
+            ).length;
+
+            return {
+              id: docSnap.id,
+              nombre: d.titulo || "Sin título",
+              categoria: d.categoria || "General",
+              participantes: totalParticipantes,
+              estado: d.activo ? "Activo" : "Inactivo",
+            };
+          }
+        );
+
+        if (activo) {
+          setResultados(listaResultados);
+          setUsuarios(listaUsuarios);
+          setEscenarios(listaEscenarios);
+        }
+      } catch (err) {
+        console.error("Error cargando panel de administración:", err);
+      } finally {
+        if (activo) {
+          setCargandoDatos(false);
+        }
+      }
+    }
+
+    cargarInformacionAdmin();
+
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  // Evaluaciones de hoy
+  const hoyStr = new Date().toDateString();
+  const evaluacionesHoy = resultados.filter((r) => {
+    if (!r.creadoEn) return false;
+    try {
+      const timestamp = r.creadoEn as Timestamp;
+      const date = timestamp.toDate
+        ? timestamp.toDate()
+        : new Date(r.creadoEn as any);
+      return date.toDateString() === hoyStr;
+    } catch {
+      return false;
+    }
+  }).length;
+
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-  
     setError("");
-  
+
     try {
       setCargando(true);
-  
       await cerrarSesion();
-  
       navigate("/");
-  
     } catch (error: any) {
-  
       console.error(error);
-  
-      if (
-        error.code === "auth/invalid-credential"
-      ) {
+      if (error.code === "auth/invalid-credential") {
         setError("Correo o contraseña incorrectos.");
       } else {
-        setError("No fue posible iniciar sesión.");
+        setError("No fue posible cerrar sesión.");
       }
-  
     } finally {
       setCargando(false);
     }
@@ -239,8 +268,8 @@ function Administracion() {
 
               <div>
                 <span>Usuarios registrados</span>
-                <strong>324</strong>
-                <small>+12 este mes</small>
+                <strong>{cargandoDatos ? "..." : usuarios.length}</strong>
+                <small>Total en sistema</small>
               </div>
 
             </div>
@@ -253,8 +282,12 @@ function Administracion() {
 
               <div>
                 <span>Escenarios activos</span>
-                <strong>8</strong>
-                <small>2 nuevas actividades</small>
+                <strong>
+                  {cargandoDatos
+                    ? "..."
+                    : escenarios.filter((e) => e.estado === "Activo").length}
+                </strong>
+                <small>{escenarios.length} creados</small>
               </div>
 
             </div>
@@ -267,8 +300,8 @@ function Administracion() {
 
               <div>
                 <span>Evaluaciones realizadas</span>
-                <strong>1,286</strong>
-                <small>+18.4% este mes</small>
+                <strong>{cargandoDatos ? "..." : resultados.length}</strong>
+                <small>Historial total</small>
               </div>
 
             </div>
@@ -281,8 +314,8 @@ function Administracion() {
 
               <div>
                 <span>Actividad hoy</span>
-                <strong>47</strong>
-                <small>Evaluaciones completadas</small>
+                <strong>{cargandoDatos ? "..." : evaluacionesHoy}</strong>
+                <small>Evaluaciones hoy</small>
               </div>
 
             </div>
@@ -463,13 +496,13 @@ function Administracion() {
               <div>
                 <h2>Actividad reciente</h2>
                 <p>
-                  Actividad registrada en la plataforma
+                  Evaluaciones y resultados registrados en la plataforma
                 </p>
               </div>
 
-              <button className="view-all">
-                Ver historial
-              </button>
+              <Link to="/resultados" className="view-all">
+                Ver todos
+              </Link>
 
             </div>
 
@@ -477,83 +510,49 @@ function Administracion() {
 
               <div className="table-header">
                 <span>Usuario</span>
-                <span>Actividad</span>
+                <span>Desempeño</span>
                 <span>Escenario</span>
                 <span>Fecha</span>
                 <span>Estado</span>
               </div>
 
-              <div className="table-row">
+              {cargandoDatos ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "#77778a" }}>
+                  Cargando actividad...
+                </div>
+              ) : resultados.length === 0 ? (
+                <div style={{ padding: "20px", textAlign: "center", color: "#77778a" }}>
+                  No se han registrado evaluaciones todavía.
+                </div>
+              ) : (
+                resultados.slice(0, 10).map((r) => (
+                  <div className="table-row" key={r.id}>
+                    <span>
+                      <strong style={{ color: "#222" }}>
+                        {r.usuarioNombre || "Participante"}
+                      </strong>
+                      <small style={{ display: "block", color: "#888", fontSize: "11px" }}>
+                        {r.usuarioEmail || ""}
+                      </small>
+                    </span>
 
-                <span>
-                  María González
-                </span>
+                    <span>
+                      <strong style={{ color: "#6366f1" }}>{r.puntuacion}%</strong>{" "}
+                      <small style={{ color: "#777" }}>
+                        ({r.aciertosTotales ?? 0} aciertos / {r.fallosTotales ?? 0} fallos)
+                      </small>
+                    </span>
 
-                <span>
-                  Completó escenario
-                </span>
+                    <span>{r.escenarioTitulo || r.escenarioId}</span>
 
-                <span>
-                  Memoria visual
-                </span>
+                    <span>{formatearFechaHora(r.creadoEn)}</span>
 
-                <span>
-                  Hoy, 10:32
-                </span>
-
-                <span className="status status-active">
-                  Completado
-                </span>
-
-              </div>
-
-              <div className="table-row">
-
-                <span>
-                  Carlos Rodríguez
-                </span>
-
-                <span>
-                  Completó escenario
-                </span>
-
-                <span>
-                  Atención selectiva
-                </span>
-
-                <span>
-                  Hoy, 09:48
-                </span>
-
-                <span className="status status-active">
-                  Completado
-                </span>
-
-              </div>
-
-              <div className="table-row">
-
-                <span>
-                  Laura Martínez
-                </span>
-
-                <span>
-                  Nuevo reporte
-                </span>
-
-                <span>
-                  Funciones ejecutivas
-                </span>
-
-                <span>
-                  Ayer, 16:20
-                </span>
-
-                <span className="status status-report">
-                  Reporte
-                </span>
-
-              </div>
+                    <span className="status status-active">
+                      Completado
+                    </span>
+                  </div>
+                ))
+              )}
 
             </div>
 

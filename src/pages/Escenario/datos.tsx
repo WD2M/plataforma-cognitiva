@@ -1,57 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  addDoc,
-  collection,
-  doc,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-
-import { db } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
-
-const ORIGEN_UNITY = "https://wd2m.github.io/PruebaWebGL/";
-
-
-interface ResultadoEscenario {
-  nombreActualPlayer: string;
-  nombreHombre: string;
-  nombreMujer: string;
-  avatar: number;
-  colorCarro: number;
-  isMutedVolumen: boolean;
-  musicaVolumen: number;
-  EfectosVolumen: number;
-  primeraVezEntrando: boolean;
-  intentosNivelTutorial: number;
-  intentosNivel1: number;
-  intentosNivel2: number;
-  intentosNivel3: number;
-  aciertosNivelTutorial: number;
-  aciertosNivel1: number;
-  aciertosNivel2: number;
-  aciertosNivel3: number;
-  fallosNivelTutorial: number;
-  fallosNivel1: number;
-  fallosNivel2: number;
-  fallosNivel3: number;
-}
+import {
+  guardarResultadoEscenario,
+  type DatosUnityEscenario,
+} from "../../services/resultadosService";
 
 export default function Escenario() {
-  const { user } = useAuth();
+  const { user, perfil } = useAuth();
 
   const [estado, setEstado] = useState("Esperando resultados...");
   const guardando = useRef(false);
 
   useEffect(() => {
     function recibirResultados(event: MessageEvent) {
-
-      //if (event.origin !== ORIGEN_UNITY) return;
-
-      if (
-        !event.data ||
-        event.data.tipo !== "RESULTADOS_ESCENARIO"
-      ) {
+      if (!event.data || event.data.tipo !== "RESULTADOS_ESCENARIO") {
         return;
       }
 
@@ -63,13 +25,10 @@ export default function Escenario() {
       }
 
       try {
-        const resultado: ResultadoEscenario =
+        const resultado: DatosUnityEscenario =
           typeof event.data.datos === "string"
             ? JSON.parse(event.data.datos)
             : event.data.datos;
-
-            console.log("mlp resultado " + resultado.nombreActualPlayer);/// trabajamos aca ojo
-
 
         if (
           typeof resultado.nombreActualPlayer !== "string" ||
@@ -81,22 +40,25 @@ export default function Escenario() {
           resultado.fallosNivel1 < 0
         ) {
           setEstado("El formato de los resultados no es válido.");
-          console.log("Fallo toda esta mierda")
           return;
         }
 
         guardando.current = true;
         setEstado("Guardando resultados...");
 
+        const nombreUsuario = perfil
+          ? `${perfil.nombre} ${perfil.apellido}`.trim()
+          : resultado.nombreActualPlayer || "Participante";
 
-        
-
-        void setDoc(doc(db, "resultados", user.uid), {
-          useruid: user.uid,
-          escenarioId: "memoria-001",
-          datos: resultado,
-          creadoEn: serverTimestamp(),
-        })
+        guardarResultadoEscenario(
+          user.uid,
+          nombreUsuario,
+          user.email || "",
+          "memoria-001",
+          "Memoria visual",
+          "Memoria",
+          resultado
+        )
           .then(() => {
             setEstado("Resultados guardados correctamente.");
           })
@@ -118,7 +80,7 @@ export default function Escenario() {
     return () => {
       window.removeEventListener("message", recibirResultados);
     };
-  }, [user]);
+  }, [user, perfil]);
 
   return (
     <section>
