@@ -167,23 +167,38 @@ export async function guardarResultadoEscenario(
 // Normalizar un documento de Firestore (por si es antiguo o tiene estructura previa)
 function normalizarDocumento(id: string, raw: Record<string, any>): RegistroResultado | null {
   const datosUnity: DatosUnityEscenario | undefined = raw.datosUnity || raw.datos;
+
+  // Caso legacy: cuando se guardaban puntuacion y errores en la raíz sin datosUnity
+  const tieneFormatoAntiguoRaiz =
+    !datosUnity &&
+    (typeof raw.puntuacion === "number" || typeof raw.errores === "number");
+
   const calculo = datosUnity
     ? calcularPuntuacion(datosUnity)
     : {
         puntuacion: typeof raw.puntuacion === "number" ? raw.puntuacion : 0,
-        aciertosTotales: raw.aciertosTotales ?? 0,
-        fallosTotales: raw.fallosTotales ?? 0,
+        aciertosTotales:
+          raw.aciertosTotales ??
+          (tieneFormatoAntiguoRaiz ? Number(raw.puntuacion || 0) : 0),
+        fallosTotales:
+          raw.fallosTotales ??
+          (tieneFormatoAntiguoRaiz ? Number(raw.errores || 0) : 0),
         intentosTotales: raw.intentosTotales ?? 0,
       };
 
-  // Filtrar registros basura que tengan 0 aciertos y 0 fallos
-  if (calculo.aciertosTotales === 0 && calculo.fallosTotales === 0) {
+  // Filtrar únicamente registros basura que tengan 0 aciertos, 0 fallos y 0 puntuación
+  if (
+    calculo.aciertosTotales === 0 &&
+    calculo.fallosTotales === 0 &&
+    calculo.puntuacion === 0
+  ) {
     return null;
   }
 
   return {
     id,
-    userUid: raw.userUid || raw.useruid || raw.uid || "",
+    // Si era un documento cuyo ID era el propio UID del usuario, también lo tomamos como fallback
+    userUid: raw.userUid || raw.useruid || raw.uid || raw.usuarioId || id,
     usuarioNombre:
       raw.usuarioNombre ||
       datosUnity?.nombreActualPlayer ||
@@ -313,40 +328,117 @@ export interface PacienteMonitoreo {
 
 // Obtener directorio completo de pacientes/participantes junto con su caracterización y todos sus resultados detallados
 export async function obtenerPacientesConResultados(): Promise<PacienteMonitoreo[]> {
+  // Ejecutamos cada consulta con su propio manejo de error para que una restricción de permisos en caracterizaciones no bloquee usuarios ni resultados
   const [usersSnap, caractSnap, todosResultados] = await Promise.all([
-    getDocs(collection(db, "users")),
-    getDocs(collection(db, "caracterizaciones")),
-    obtenerTodosLosResultados(),
+    getDocs(collection(db, "users")).catch((err) => {
+      console.warn("Error leyendo colección users:", err);
+      return null;
+    }),
+    getDocs(collection(db, "caracterizaciones")).catch((err) => {
+      console.warn("Error leyendo colección caracterizaciones:", err);
+      return null;
+    }),
+    obtenerTodosLosResultados().catch((err) => {
+      console.warn("Error leyendo colección resultados:", err);
+      return [] as RegistroResultado[];
+    }),
   ]);
 
   const caractMap: Record<string, Record<string, any>> = {};
-  for (const cDoc of caractSnap.docs) {
-    const data = cDoc.data();
-    const uid = data.usuarioId || cDoc.id;
-    caractMap[uid] = data;
+  if (caractSnap) {
+    for (const cDoc of caractSnap.docs) {
+      const data = cDoc.data();
+      const uid = data.usuarioId || cDoc.id;
+      caractMap[uid] = data;
+    }
   }
 
   const resultadosPorUid: Record<string, RegistroResultado[]> = {};
   for (const r of todosResultados) {
-    if (!resultadosPorUid[r.userUid]) {
-      resultadosPorUid[r.userUid] = [];
+    const keyUid = r.userUid || "sin-uid";
+    if (!resultadosPorUid[keyUid]) {
+      resultadosPorUid[keyUid] = [];
     }
-    resultadosPorUid[r.userUid].push(r);
+    resultadosPorUid[keyUid].push(r);
   }
 
   const listaPacientes: PacienteMonitoreo[] = [];
+  const uidsProcesados = new Set<string>();
 
-  for (const uDoc of usersSnap.docs) {
-    const data = uDoc.data();
-    const uid = uDoc.id;
+  if (usersSnap) {
+    for (const uDoc of usersSnap.docs) {
+      const data = uDoc.data();
+      const uid = uDoc.id;
+      uidsProcesados.add(uid);
+
+      const caract = caractMap[uid] || {};
+      const misResultados = resultadosPorUid[uid] || [];
+
+      const nombre = data.nombre || "";
+      const apellido = data.apellido || "";
+      const nombreCompleto =
+        `${nombre} ${apellido}`.trim() ||
+        misResultados[0]?.usuarioNombre ||
+        "Participante";
+      const documento =
+        String(data.documento || caract.documento || "").trim() ||
+        "Sin registrar";
+
+      const totalPartidas = misResultados.length;
+      const promedioDesempeno =
+        totalPartidas > 0
+          ? Math.round(
+              misResultados.reduce((acc, item) => acc + item.puntuacion, 0) /
+                totalPartidas
+            )
+          : 0;
+
+      const aciertosAcumulados = misResultados.reduce(
+        (acc, item) => acc + item.aciertosTotales,
+        0
+      );
+      const fallosAcumulados = misResultados.reduce(
+        (acc, item) => acc + item.fallosTotales,
+        0
+      );
+
+      listaPacientes.push({
+        uid,
+        nombre,
+        apellido,
+        nombreCompleto,
+        documento,
+        email: data.email || misResultados[0]?.usuarioEmail || "—",
+        rol: data.rol || "participante",
+        estado: Boolean(data.estado),
+        edad: caract.edad,
+        genero: caract.genero,
+        escolaridad: caract.escolaridad,
+        ciudad: caract.ciudad,
+        ocupacionActual: caract.ocupacionActual,
+        diagnosticoDificultad: caract.diagnosticoDificultad,
+        objetivos: caract.objetivos,
+        resultados: misResultados,
+        totalPartidas,
+        promedioDesempeno,
+        aciertosAcumulados,
+        fallosAcumulados,
+        ultimaFecha: misResultados[0]?.creadoEn || data.creadoEn || null,
+      });
+    }
+  }
+
+  // Si existen resultados en la colección `resultados` de algún usuario cuyo documento en `users` no apareció o tenía otro ID,
+  // también lo reconstruimos y mostramos para que nunca se oculte un jugador con partidas registradas
+  for (const [uid, misResultados] of Object.entries(resultadosPorUid)) {
+    if (uidsProcesados.has(uid)) continue;
+
     const caract = caractMap[uid] || {};
-    const misResultados = resultadosPorUid[uid] || [];
-
-    const nombre = data.nombre || "";
-    const apellido = data.apellido || "";
-    const nombreCompleto = `${nombre} ${apellido}`.trim() || "Participante";
-    const documento =
-      String(data.documento || caract.documento || "").trim() || "Sin registrar";
+    const primerResultado = misResultados[0];
+    const nombreCompleto =
+      primerResultado?.usuarioNombre ||
+      primerResultado?.datosUnity?.nombreActualPlayer ||
+      "Participante";
 
     const totalPartidas = misResultados.length;
     const promedioDesempeno =
@@ -368,13 +460,13 @@ export async function obtenerPacientesConResultados(): Promise<PacienteMonitoreo
 
     listaPacientes.push({
       uid,
-      nombre,
-      apellido,
+      nombre: nombreCompleto,
+      apellido: "",
       nombreCompleto,
-      documento,
-      email: data.email || "—",
-      rol: data.rol || "participante",
-      estado: Boolean(data.estado),
+      documento: String(caract.documento || "").trim() || "Sin registrar",
+      email: primerResultado?.usuarioEmail || "—",
+      rol: "participante",
+      estado: true,
       edad: caract.edad,
       genero: caract.genero,
       escolaridad: caract.escolaridad,
@@ -387,9 +479,17 @@ export async function obtenerPacientesConResultados(): Promise<PacienteMonitoreo
       promedioDesempeno,
       aciertosAcumulados,
       fallosAcumulados,
-      ultimaFecha: misResultados[0]?.creadoEn || data.creadoEn || null,
+      ultimaFecha: primerResultado?.creadoEn || null,
     });
   }
 
-  return listaPacientes;
+  // Ordenar: primero los usuarios que tienen partidas jugadas (del que tiene más recientes al más antiguo)
+  return listaPacientes.sort((a, b) => {
+    if (b.totalPartidas !== a.totalPartidas) {
+      return b.totalPartidas - a.totalPartidas;
+    }
+    const fA = (a.ultimaFecha as Timestamp)?.toMillis?.() || 0;
+    const fB = (b.ultimaFecha as Timestamp)?.toMillis?.() || 0;
+    return fB - fA;
+  });
 }

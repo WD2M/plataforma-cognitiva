@@ -63,28 +63,28 @@ function Administracion() {
       try {
         const [listaResultados, listaPacientes, escenariosSnap] =
           await Promise.all([
-            obtenerTodosLosResultados(),
-            obtenerPacientesConResultados(),
-            getDocs(collection(db, "escenarios")),
+            obtenerTodosLosResultados().catch(() => [] as RegistroResultado[]),
+            obtenerPacientesConResultados().catch(() => [] as PacienteMonitoreo[]),
+            getDocs(collection(db, "escenarios")).catch(() => null),
           ]);
 
-        const listaEscenarios: EscenarioItem[] = escenariosSnap.docs.map(
-          (docSnap) => {
-            const d = docSnap.data();
-            const totalParticipantes = listaResultados.filter(
-              (r) =>
-                r.escenarioId === docSnap.id || r.escenarioTitulo === d.titulo
-            ).length;
+        const listaEscenarios: EscenarioItem[] = escenariosSnap
+          ? escenariosSnap.docs.map((docSnap) => {
+              const d = docSnap.data();
+              const totalParticipantes = listaResultados.filter(
+                (r) =>
+                  r.escenarioId === docSnap.id || r.escenarioTitulo === d.titulo
+              ).length;
 
-            return {
-              id: docSnap.id,
-              nombre: d.titulo || "Sin título",
-              categoria: d.categoria || "General",
-              participantes: totalParticipantes,
-              estado: d.activo ? "Activo" : "Inactivo",
-            };
-          }
-        );
+              return {
+                id: docSnap.id,
+                nombre: d.titulo || "Sin título",
+                categoria: d.categoria || "General",
+                participantes: totalParticipantes,
+                estado: d.activo ? "Activo" : "Inactivo",
+              };
+            })
+          : [];
 
         if (activo) {
           setResultados(listaResultados);

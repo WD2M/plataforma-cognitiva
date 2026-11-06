@@ -149,10 +149,8 @@ function Perfil() {
   const ultimaActividad =
     totalEscenarios > 0 ? formatearFecha(resultados[0].creadoEn) : "—";
 
-  // Cálculos dinámicos para Administrador
-  const soloParticipantes = pacientes.filter(
-    (p) => p.rol?.toLowerCase() !== "administrador" || p.totalPartidas > 0
-  );
+  // Cálculos dinámicos para Administrador: mostramos todos los usuarios registrados (priorizando los que tienen partidas)
+  const soloParticipantes = pacientes;
   const totalPacientesMonitoreados = soloParticipantes.length;
   const totalEvaluacionesGlobal = pacientes.reduce(
     (acc, p) => acc + p.totalPartidas,
