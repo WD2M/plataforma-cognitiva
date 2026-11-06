@@ -140,7 +140,7 @@ function Administracion() {
     try {
       setCargando(true);
       await cerrarSesion();
-      navigate("/");
+      navigate("/login");
     } catch (error: any) {
       console.error(error);
       if (error.code === "auth/invalid-credential") {
@@ -196,16 +196,11 @@ function Administracion() {
             <span>▣</span>
             Nuevo Escenario
           </button>
-
-          <Link to="/resultados" className="menu-item">
-            <span>▤</span>
-            Vista Resultados
-          </Link>
         </nav>
 
         <div className="sidebar-bottom">
           <Link to="/" className="back-home">
-            ← Volver a la plataforma
+            ← Ir al inicio
           </Link>
 
           <form onSubmit={handleLogin}>

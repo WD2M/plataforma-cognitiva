@@ -218,7 +218,10 @@ function Perfil() {
     <div className="perfil-page">
       {/* NAVBAR */}
       <header className="perfil-navbar">
-        <div className="perfil-brand" onClick={() => navigate("/")}>
+        <div
+          className="perfil-brand"
+          onClick={() => navigate(esAdmin ? "/administracion" : "/")}
+        >
           <div className="perfil-brand-icon">Ψ</div>
           <div>
             <strong>LAPSUCC</strong>

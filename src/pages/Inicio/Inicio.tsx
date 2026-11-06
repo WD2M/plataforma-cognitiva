@@ -71,7 +71,7 @@ function Inicio() {
           </div>
 
           
-          <Link to={esAdmin ? "/administracion" : "/perfil"}>
+          <Link to="/perfil">
               <div className="home-avatar">
                 {perfil? `${perfil.nombre[0]}` : "Cargando..."}
               </div>
@@ -93,20 +93,22 @@ function Inicio() {
           <div className="hero-content">
 
             <span className="hero-tag">
-              PLATAFORMA INTERACTIVA
+              {esAdmin ? "PANEL DE SUPERVISIÓN CLÍNICA" : "PLATAFORMA INTERACTIVA"}
             </span>
 
             <h1>
-              Explora tu
+              {esAdmin ? "Supervisa el" : "Explora tu"}
               <br />
 
-              <span>experiencia cognitiva.</span>
+              <span>
+                {esAdmin ? "desempeño cognitivo." : "experiencia cognitiva."}
+              </span>
             </h1>
 
             <p>
-              Participa en escenarios interactivos diseñados
-              para explorar diferentes procesos cognitivos como
-              memoria, atención y funciones ejecutivas.
+              {esAdmin
+                ? "Monitorea a los pacientes registrados, consulta sus evaluaciones por nombre o documento y analiza el desglose detallado de aciertos y fallos por nivel."
+                : "Participa en escenarios interactivos diseñados para explorar diferentes procesos cognitivos como memoria, atención y funciones ejecutivas."}
             </p>
 
 
@@ -189,10 +191,10 @@ function Inicio() {
 
             <div className="floating-card card-bottom">
 
-              <span>Progreso</span>
+              <span>{esAdmin ? "Supervisión" : "Progreso"}</span>
 
               <strong>
-                78%
+                {esAdmin ? "Activa" : "78%"}
               </strong>
 
               <div className="progress-mini">
@@ -223,13 +225,6 @@ function Inicio() {
                 ¿Qué quieres hacer?
               </h2>
             </div>
-
-            <Link
-              to="/catalogo"
-              className="see-all"
-            >
-              Ver todos →
-            </Link>
 
           </div>
 
@@ -367,13 +362,6 @@ function Inicio() {
                 información relacionada con el desempeño del
                 participante.
               </p>
-
-              <Link
-                to="/catalogo"
-                className="about-link"
-              >
-                Comenzar una actividad →
-              </Link>
 
             </div>
 
