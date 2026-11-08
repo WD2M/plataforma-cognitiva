@@ -1,61 +1,24 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  addDoc,
-  collection,
-  doc,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-
-import { db } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
-
-const ORIGEN_UNITY = "https://wd2m.github.io/PruebaWebGL/";
-
-
-interface ResultadoEscenario {
-  nombreActualPlayer: string;
-  nombreHombre: string;
-  nombreMujer: string;
-  avatar: number;
-  colorCarro: number;
-  isMutedVolumen: boolean;
-  musicaVolumen: number;
-  EfectosVolumen: number;
-  primeraVezEntrando: boolean;
-  intentosNivelTutorial: number;
-  intentosNivel1: number;
-  intentosNivel2: number;
-  intentosNivel3: number;
-  aciertosNivelTutorial: number;
-  aciertosNivel1: number;
-  aciertosNivel2: number;
-  aciertosNivel3: number;
-  fallosNivelTutorial: number;
-  fallosNivel1: number;
-  fallosNivel2: number;
-  fallosNivel3: number;
-}
+import {
+  guardarOActualizarResultadoSesion,
+  type DatosUnityEscenario,
+} from "../../services/resultadosService";
 
 export default function Escenario() {
-  const { user } = useAuth();
+  const { user, perfil } = useAuth();
 
-  const [estado, setEstado] = useState("Esperando resultados...");
+  const [estado, setEstado] = useState("Esperando inicio de la actividad...");
   const guardando = useRef(false);
+  const sesionDocIdRef = useRef<string | null>(null);
+  const ultimoHashPartida = useRef<string>("");
+  const maxJugadasSesionRef = useRef<number>(0);
 
   useEffect(() => {
     function recibirResultados(event: MessageEvent) {
-
-      //if (event.origin !== ORIGEN_UNITY) return;
-
-      if (
-        !event.data ||
-        event.data.tipo !== "RESULTADOS_ESCENARIO"
-      ) {
+      if (!event.data || event.data.tipo !== "RESULTADOS_ESCENARIO") {
         return;
       }
-
-      if (guardando.current) return;
 
       if (!user) {
         setEstado("Debes iniciar sesión para guardar resultados.");
@@ -63,42 +26,80 @@ export default function Escenario() {
       }
 
       try {
-        const resultado: ResultadoEscenario =
+        const resultado: DatosUnityEscenario =
           typeof event.data.datos === "string"
             ? JSON.parse(event.data.datos)
             : event.data.datos;
 
-            console.log("mlp resultado " + resultado.nombreActualPlayer);/// trabajamos aca ojo
-
-
         if (
-          typeof resultado.nombreActualPlayer !== "string" ||
-          resultado.nombreActualPlayer.length === 0 ||
-          !Number.isFinite(resultado.fallosNivel3) ||
-          !Number.isFinite(resultado.fallosNivel2) ||
+          !resultado ||
           !Number.isFinite(resultado.fallosNivel1) ||
-          resultado.fallosNivel2 < 0 ||
-          resultado.fallosNivel1 < 0
+          !Number.isFinite(resultado.fallosNivel2) ||
+          !Number.isFinite(resultado.fallosNivel3)
         ) {
-          setEstado("El formato de los resultados no es válido.");
-          console.log("Fallo toda esta mierda")
           return;
         }
 
+        const totalAciertos =
+          (resultado.aciertosNivelTutorial || 0) +
+          (resultado.aciertosNivel1 || 0) +
+          (resultado.aciertosNivel2 || 0) +
+          (resultado.aciertosNivel3 || 0);
+
+        const totalFallos =
+          (resultado.fallosNivelTutorial || 0) +
+          (resultado.fallosNivel1 || 0) +
+          (resultado.fallosNivel2 || 0) +
+          (resultado.fallosNivel3 || 0);
+
+        const totalEvaluado = totalAciertos + totalFallos;
+
+        if (totalEvaluado === 0) {
+          if (maxJugadasSesionRef.current > 0) {
+            sesionDocIdRef.current = null;
+            maxJugadasSesionRef.current = 0;
+            ultimoHashPartida.current = "";
+          }
+          return;
+        }
+
+        if (totalEvaluado < maxJugadasSesionRef.current) {
+          sesionDocIdRef.current = null;
+          maxJugadasSesionRef.current = 0;
+          ultimoHashPartida.current = "";
+        }
+        maxJugadasSesionRef.current = totalEvaluado;
+
+        const hashEstado = `${resultado.nombreActualPlayer}_${totalAciertos}_${totalFallos}`;
+        if (hashEstado === ultimoHashPartida.current) {
+          return;
+        }
+
+        if (guardando.current) return;
+
         guardando.current = true;
-        setEstado("Guardando resultados...");
+        setEstado("Actualizando informe de la partida...");
 
+        const nombreUsuario = perfil
+          ? `${perfil.nombre} ${perfil.apellido}`.trim()
+          : resultado.nombreActualPlayer || "Participante";
 
-        
-
-        void setDoc(doc(db, "resultados", user.uid), {
-          useruid: user.uid,
-          escenarioId: "memoria-001",
-          datos: resultado,
-          creadoEn: serverTimestamp(),
-        })
-          .then(() => {
-            setEstado("Resultados guardados correctamente.");
+        guardarOActualizarResultadoSesion(
+          sesionDocIdRef.current,
+          user.uid,
+          nombreUsuario,
+          user.email || "",
+          "memoria-001",
+          "Memoria visual",
+          "Memoria",
+          resultado
+        )
+          .then((docId) => {
+            sesionDocIdRef.current = docId;
+            ultimoHashPartida.current = hashEstado;
+            setEstado(
+              `Informe actualizado (${totalAciertos} aciertos / ${totalFallos} fallos).`
+            );
           })
           .catch((error) => {
             console.error("Error guardando resultados:", error);
@@ -109,7 +110,6 @@ export default function Escenario() {
           });
       } catch (error) {
         console.error("Mensaje de Unity inválido:", error);
-        setEstado("No se pudieron interpretar los resultados.");
       }
     }
 
@@ -118,7 +118,7 @@ export default function Escenario() {
     return () => {
       window.removeEventListener("message", recibirResultados);
     };
-  }, [user]);
+  }, [user, perfil]);
 
   return (
     <section>

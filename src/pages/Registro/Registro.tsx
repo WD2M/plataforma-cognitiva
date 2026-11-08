@@ -11,6 +11,7 @@ function Registro() {
   const navigate = useNavigate();
   const [nombre, setNombre] = useState("");
   const [apellido, setApellido] = useState("");
+  const [documento, setDocumento] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -42,8 +43,8 @@ function Registro() {
       nombre,
       apellido,
       email,
-      password
-      
+      password,
+      documento
     );
 
     navigate("/");
@@ -231,6 +232,32 @@ function Registro() {
                   placeholder="Tu apellido"
                   value={apellido}
                   onChange={(e) => setApellido(e.target.value)}
+                  required
+                />
+
+              </div>
+
+            </div>
+
+            {/* Número de documento */}
+            <div className="register-input-group">
+
+              <label htmlFor="documento">
+                Número de documento
+              </label>
+
+              <div className="register-input-wrapper">
+
+                <span className="register-input-icon">
+                  🪪
+                </span>
+
+                <input
+                  id="documento"
+                  type="text"
+                  placeholder="Ej. 1002345678"
+                  value={documento}
+                  onChange={(e) => setDocumento(e.target.value)}
                   required
                 />
 

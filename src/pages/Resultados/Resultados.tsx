@@ -1,64 +1,87 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import "./Resultados.css";
 import { useAuth } from "../../context/AuthContext";
+import {
+  obtenerResultadosUsuario,
+  obtenerTodosLosResultados,
+  type RegistroResultado,
+} from "../../services/resultadosService";
+import type { Timestamp } from "firebase/firestore";
 
-interface Resultado {
-  id: number;
-  escenario: string;
-  categoria: string;
-  fecha: string;
-  tiempo: string;
-  puntuacion: number;
-  estado: string;
+function formatearFecha(fecha: unknown): string {
+  if (!fecha) return "—";
+  try {
+    const timestamp = fecha as Timestamp;
+    const date = timestamp.toDate ? timestamp.toDate() : new Date(fecha as string | number);
+    return date.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
 }
 
-const resultados: Resultado[] = [
-  {
-    id: 1,
-    escenario: "Memoria visual",
-    categoria: "Memoria",
-    fecha: "12 Sep 2026",
-    tiempo: "08:42",
-    puntuacion: 87,
-    estado: "Completado",
-  },
-  {
-    id: 2,
-    escenario: "Atención selectiva",
-    categoria: "Atención",
-    fecha: "10 Sep 2026",
-    tiempo: "06:18",
-    puntuacion: 74,
-    estado: "Completado",
-  },
-  {
-    id: 3,
-    escenario: "Secuencia lógica",
-    categoria: "Funciones ejecutivas",
-    fecha: "08 Sep 2026",
-    tiempo: "10:25",
-    puntuacion: 92,
-    estado: "Completado",
-  },
-  {
-    id: 4,
-    escenario: "Reconocimiento de patrones",
-    categoria: "Atención",
-    fecha: "05 Sep 2026",
-    tiempo: "07:51",
-    puntuacion: 68,
-    estado: "Completado",
-  },
-];
-
 function Resultados() {
-  const promedio = Math.round(
-    resultados.reduce(
-      (total, resultado) => total + resultado.puntuacion,
-      0
-    ) / resultados.length
-  );
-  const { perfil } = useAuth();
+  const { user, perfil } = useAuth();
+  const esAdmin = perfil?.rol?.toLowerCase() === "administrador";
+  const [resultados, setResultados] = useState<RegistroResultado[]>([]);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    let activo = true;
+
+    async function cargar() {
+      if (!user) {
+        setCargando(false);
+        return;
+      }
+
+      try {
+        const datos = esAdmin
+          ? await obtenerTodosLosResultados()
+          : await obtenerResultadosUsuario(user.uid);
+        if (activo) {
+          setResultados(datos);
+        }
+      } catch (error) {
+        console.error("Error al obtener resultados:", error);
+      } finally {
+        if (activo) {
+          setCargando(false);
+        }
+      }
+    }
+
+    cargar();
+
+    return () => {
+      activo = false;
+    };
+  }, [user, esAdmin]);
+
+  const total = resultados.length;
+  const promedio =
+    total > 0
+      ? Math.round(
+          resultados.reduce((acc, r) => acc + (r.puntuacion || 0), 0) / total
+        )
+      : 0;
+
+  // Promedio por categoría
+  const categoriasMap: Record<string, { total: number; suma: number }> = {};
+  for (const r of resultados) {
+    const cat = r.categoria || "General";
+    if (!categoriasMap[cat]) {
+      categoriasMap[cat] = { total: 0, suma: 0 };
+    }
+    categoriasMap[cat].total += 1;
+    categoriasMap[cat].suma += r.puntuacion || 0;
+  }
+
+  const ultimaActividad = resultados[0];
 
   return (
     <div className="results-page">
@@ -118,7 +141,7 @@ function Resultados() {
 
           </div>
 
-          <Link to="/administracion">
+          <Link to={esAdmin ? "/administracion" : "/perfil"}>
               <div className="home-avatar">
                 {perfil? `${perfil.nombre[0]}` : "Cargando..."}
               </div>
@@ -142,26 +165,27 @@ function Resultados() {
           <div>
 
             <span className="results-label">
-              MI PROGRESO
+              {esAdmin ? "MONITOREO GENERAL" : "MI PROGRESO"}
             </span>
 
             <h1>
-              Resultados y desempeño
+              {esAdmin ? "Resultados globales de participantes" : "Resultados y desempeño"}
             </h1>
 
             <p>
-              Consulta el historial de tus actividades
-              y observa cómo ha evolucionado tu desempeño.
+              {esAdmin
+                ? "Supervisa el historial consolidado de evaluaciones realizadas en la plataforma."
+                : "Consulta el historial de tus actividades y observa cómo ha evolucionado tu desempeño."}
             </p>
 
           </div>
 
 
           <Link
-            to="/catalogo"
+            to={esAdmin ? "/perfil" : "/catalogo"}
             className="results-action"
           >
-            Realizar escenario
+            {esAdmin ? "Buscar paciente por nombre / documento" : "Realizar escenario"}
             <span>→</span>
           </Link>
 
@@ -189,7 +213,7 @@ function Resultados() {
               </span>
 
               <strong>
-                {resultados.length}
+                {cargando ? "..." : total}
               </strong>
 
               <small>
@@ -216,7 +240,7 @@ function Resultados() {
               </span>
 
               <strong>
-                {promedio}%
+                {cargando ? "..." : `${promedio}%`}
               </strong>
 
               <small>
@@ -228,7 +252,7 @@ function Resultados() {
           </div>
 
 
-          {/* Tiempo */}
+          {/* Aciertos totales */}
 
           <div className="stat-card">
 
@@ -239,15 +263,17 @@ function Resultados() {
             <div className="stat-content">
 
               <span>
-                Tiempo de actividad
+                Aciertos acumulados
               </span>
 
               <strong>
-                33 min
+                {cargando
+                  ? "..."
+                  : resultados.reduce((acc, r) => acc + (r.aciertosTotales || 0), 0)}
               </strong>
 
               <small>
-                Tiempo acumulado
+                Respuestas correctas
               </small>
 
             </div>
@@ -270,11 +296,15 @@ function Resultados() {
               </span>
 
               <strong>
-                87%
+                {cargando
+                  ? "..."
+                  : ultimaActividad
+                  ? `${ultimaActividad.puntuacion}%`
+                  : "—"}
               </strong>
 
               <small>
-                Memoria visual
+                {ultimaActividad ? ultimaActividad.escenarioTitulo : "Sin registros"}
               </small>
 
             </div>
@@ -316,7 +346,7 @@ function Resultados() {
                 <div>
 
                   <strong>
-                    {promedio}
+                    {cargando ? "..." : promedio}
                   </strong>
 
                   <span>
@@ -345,76 +375,37 @@ function Resultados() {
 
             <div className="performance-bars">
 
-              <div className="bar-item">
+              {Object.keys(categoriasMap).length > 0 ? (
+                Object.entries(categoriasMap).map(([categoria, stat]) => {
+                  const catPromedio = Math.round(stat.suma / stat.total);
+                  const cls =
+                    categoria.toLowerCase().includes("memoria")
+                      ? "memory"
+                      : categoria.toLowerCase().includes("atención") ||
+                        categoria.toLowerCase().includes("atencion")
+                      ? "attention"
+                      : "executive";
 
-                <div className="bar-header">
-
-                  <span>
-                    Memoria
-                  </span>
-
-                  <strong>
-                    87%
-                  </strong>
-
-                </div>
-
-                <div className="bar">
-                  <div
-                    className="bar-fill memory"
-                    style={{ width: "87%" }}
-                  />
-                </div>
-
-              </div>
-
-
-              <div className="bar-item">
-
-                <div className="bar-header">
-
-                  <span>
-                    Atención
-                  </span>
-
-                  <strong>
-                    71%
-                  </strong>
-
-                </div>
-
-                <div className="bar">
-                  <div
-                    className="bar-fill attention"
-                    style={{ width: "71%" }}
-                  />
-                </div>
-
-              </div>
-
-
-              <div className="bar-item">
-
-                <div className="bar-header">
-
-                  <span>
-                    Funciones ejecutivas
-                  </span>
-
-                  <strong>
-                    92%
-                  </strong>
-
-                </div>
-
-                <div className="bar">
-                  <div
-                    className="bar-fill executive"
-                    style={{ width: "92%" }}
-                  />
-                </div>
-
-              </div>
+                  return (
+                    <div className="bar-item" key={categoria}>
+                      <div className="bar-header">
+                        <span>{categoria}</span>
+                        <strong>{catPromedio}%</strong>
+                      </div>
+                      <div className="bar">
+                        <div
+                          className={`bar-fill ${cls}`}
+                          style={{ width: `${catPromedio}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <p style={{ color: "#77778a", fontSize: "14px" }}>
+                  Aún no has completado escenarios para calcular tu desempeño por categoría.
+                </p>
+              )}
 
             </div>
 
@@ -443,11 +434,6 @@ function Resultados() {
 
             </div>
 
-            <button className="filter-button">
-              Todas las actividades
-              <span>⌄</span>
-            </button>
-
           </div>
 
 
@@ -470,7 +456,7 @@ function Resultados() {
               </span>
 
               <span>
-                TIEMPO
+                ACIERTOS / FALLOS
               </span>
 
               <span>
@@ -486,68 +472,54 @@ function Resultados() {
 
             {/* Filas */}
 
-            {resultados.map((resultado) => (
-
-              <div
-                className="history-row"
-                key={resultado.id}
-              >
-
-                <div className="scenario-name">
-
-                  <div className="scenario-icon">
-                    ◈
-                  </div>
-
-                  <strong>
-                    {resultado.escenario}
-                  </strong>
-
-                </div>
-
-
-                <span className="category">
-                  {resultado.categoria}
-                </span>
-
-
-                <span className="date">
-                  {resultado.fecha}
-                </span>
-
-
-                <span className="time">
-                  {resultado.tiempo}
-                </span>
-
-
-                <div className="score">
-
-                  <strong>
-                    {resultado.puntuacion}%
-                  </strong>
-
-                  <div className="mini-bar">
-
-                    <div
-                      style={{
-                        width:
-                          `${resultado.puntuacion}%`,
-                      }}
-                    />
-
-                  </div>
-
-                </div>
-
-
-                <span className="status">
-                  {resultado.estado}
-                </span>
-
+            {cargando ? (
+              <div style={{ padding: "24px", textAlign: "center", color: "#77778a" }}>
+                Cargando historial de resultados...
               </div>
+            ) : resultados.length === 0 ? (
+              <div style={{ padding: "32px", textAlign: "center", color: "#77778a" }}>
+                Aún no tienes resultados registrados. Completa una actividad desde el catálogo.
+              </div>
+            ) : (
+              resultados.map((resultado) => (
+                <div className="history-row" key={resultado.id}>
+                  <div className="scenario-name">
+                    <div className="scenario-icon">◈</div>
+                    <div>
+                      <strong style={{ display: "block" }}>
+                        {resultado.escenarioTitulo || "Escenario"}
+                      </strong>
+                      {esAdmin && (
+                        <small style={{ color: "#6366f1", fontSize: "11px" }}>
+                          Paciente: {resultado.usuarioNombre || "Participante"}
+                        </small>
+                      )}
+                    </div>
+                  </div>
 
-            ))}
+                  <span className="category">{resultado.categoria || "General"}</span>
+
+                  <span className="date">{formatearFecha(resultado.creadoEn)}</span>
+
+                  <span className="time">
+                    {resultado.aciertosTotales ?? 0} aciertos / {resultado.fallosTotales ?? 0} fallos
+                  </span>
+
+                  <div className="score">
+                    <strong>{resultado.puntuacion}%</strong>
+                    <div className="mini-bar">
+                      <div
+                        style={{
+                          width: `${resultado.puntuacion}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <span className="status">Completado</span>
+                </div>
+              ))
+            )}
 
           </div>
 

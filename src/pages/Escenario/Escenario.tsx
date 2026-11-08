@@ -2,42 +2,11 @@ import { useParams, Link } from "react-router-dom";
 import "./Escenario.css";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  addDoc,
-  collection,
-  doc,
-  serverTimestamp,
-  setDoc,
-} from "firebase/firestore";
-
-import { db } from "../../firebase/config";
 import { useAuth } from "../../context/AuthContext";
-
-const ORIGEN_UNITY = "https://wd2m.github.io/PruebaWebGL/";
-
-interface ResultadoEscenario {
-  nombreActualPlayer: string;
-  nombreHombre: string;
-  nombreMujer: string;
-  avatar: number;
-  colorCarro: number;
-  isMutedVolumen: boolean;
-  musicaVolumen: number;
-  EfectosVolumen: number;
-  primeraVezEntrando: boolean;
-  intentosNivelTutorial: number;
-  intentosNivel1: number;
-  intentosNivel2: number;
-  intentosNivel3: number;
-  aciertosNivelTutorial: number;
-  aciertosNivel1: number;
-  aciertosNivel2: number;
-  aciertosNivel3: number;
-  fallosNivelTutorial: number;
-  fallosNivel1: number;
-  fallosNivel2: number;
-  fallosNivel3: number;
-}
+import {
+  guardarOActualizarResultadoSesion,
+  type DatosUnityEscenario,
+} from "../../services/resultadosService";
 
 
 
@@ -95,95 +64,132 @@ const escenarios = {
 
 
 function Escenario() {
+  const { id } = useParams();
+  const { user, perfil } = useAuth();
 
-  const { user } = useAuth();
+  const escenario =
+    escenarios[id as unknown as keyof typeof escenarios] ?? escenarios[1];
 
-  const [estado, setEstado] = useState("Esperando resultados...");
+  const [estado, setEstado] = useState("Esperando inicio de la actividad...");
   const guardando = useRef(false);
+  const sesionDocIdRef = useRef<string | null>(null);
+  const ultimoHashPartida = useRef<string>("");
+  const maxJugadasSesionRef = useRef<number>(0);
 
   useEffect(() => {
-      function recibirResultados(event: MessageEvent) {
-  
-        //if (event.origin !== ORIGEN_UNITY) return;
-  
+    function recibirResultados(event: MessageEvent) {
+      if (!event.data || event.data.tipo !== "RESULTADOS_ESCENARIO") {
+        return;
+      }
+
+      if (!user) {
+        setEstado("Debes iniciar sesión para registrar tu actividad.");
+        return;
+      }
+
+      try {
+        const resultado: DatosUnityEscenario =
+          typeof event.data.datos === "string"
+            ? JSON.parse(event.data.datos)
+            : event.data.datos;
+
+        // 1. Validar formato numérico básico
         if (
-          !event.data ||
-          event.data.tipo !== "RESULTADOS_ESCENARIO"
+          !resultado ||
+          !Number.isFinite(resultado.fallosNivel1) ||
+          !Number.isFinite(resultado.fallosNivel2) ||
+          !Number.isFinite(resultado.fallosNivel3)
         ) {
           return;
         }
-  
-        if (guardando.current) return;
-  
-        if (!user) {
-          setEstado("Debes iniciar sesión para guardar resultados.");
+
+        // 2. Comprobar que existan aciertos o fallos reales (no solo intentos o menús/color de carro)
+        const totalAciertos =
+          (resultado.aciertosNivelTutorial || 0) +
+          (resultado.aciertosNivel1 || 0) +
+          (resultado.aciertosNivel2 || 0) +
+          (resultado.aciertosNivel3 || 0);
+
+        const totalFallos =
+          (resultado.fallosNivelTutorial || 0) +
+          (resultado.fallosNivel1 || 0) +
+          (resultado.fallosNivel2 || 0) +
+          (resultado.fallosNivel3 || 0);
+
+        const totalEvaluado = totalAciertos + totalFallos;
+
+        // Si no hay ni un solo acierto ni fallo real, es menú inicial / cambio de color de carro.
+        // Si veníamos de una partida anterior en la misma pestaña, reseteamos la referencia para que la nueva partida cree un nuevo informe en el historial.
+        if (totalEvaluado === 0) {
+          if (maxJugadasSesionRef.current > 0) {
+            sesionDocIdRef.current = null;
+            maxJugadasSesionRef.current = 0;
+            ultimoHashPartida.current = "";
+          }
           return;
         }
-  
-        try {
-          const resultado: ResultadoEscenario =
-            typeof event.data.datos === "string"
-              ? JSON.parse(event.data.datos)
-              : event.data.datos;
-  
-              console.log("mlp resultado " + resultado.nombreActualPlayer);/// trabajamos aca ojo
-  
-  
-          if (
-            typeof resultado.nombreActualPlayer !== "string" ||
-            resultado.nombreActualPlayer.length === 0 ||
-            !Number.isFinite(resultado.fallosNivel3) ||
-            !Number.isFinite(resultado.fallosNivel2) ||
-            !Number.isFinite(resultado.fallosNivel1) ||
-            resultado.fallosNivel2 < 0 ||
-            resultado.fallosNivel1 < 0
-          ) {
-            setEstado("El formato de los resultados no es válido.");
-            console.log("Fallo toda esta mierda")
-            return;
-          }
-  
-          guardando.current = true;
-          setEstado("Guardando resultados...");
-  
-  
-          
-  
-          void setDoc(doc(db, "resultados", user.uid), {
-            useruid: user.uid,
-            escenarioId: "memoria-001",
-            datos: resultado,
-            creadoEn: serverTimestamp(),
-          })
-            .then(() => {
-              setEstado("Resultados guardados correctamente.");
-            })
-            .catch((error) => {
-              console.error("Error guardando resultados:", error);
-              setEstado("No se pudieron guardar los resultados.");
-            })
-            .finally(() => {
-              guardando.current = false;
-            });
-        } catch (error) {
-          console.error("Mensaje de Unity inválido:", error);
-          setEstado("No se pudieron interpretar los resultados.");
+
+        // Si el usuario reinició la partida desde 0 dentro de Unity (los contadores bajaron respecto al máximo de esta sesión),
+        // iniciamos un nuevo documento de informe para la nueva partida
+        if (totalEvaluado < maxJugadasSesionRef.current) {
+          sesionDocIdRef.current = null;
+          maxJugadasSesionRef.current = 0;
+          ultimoHashPartida.current = "";
         }
+        maxJugadasSesionRef.current = totalEvaluado;
+
+        // 3. Evitar guardar exactamente el mismo estado si no ha cambiado el marcador
+        const hashEstado = `${resultado.nombreActualPlayer}_${totalAciertos}_${totalFallos}`;
+        if (hashEstado === ultimoHashPartida.current) {
+          return;
+        }
+
+        if (guardando.current) return;
+
+        guardando.current = true;
+        setEstado(
+          `Progreso registrado: ${totalAciertos} aciertos, ${totalFallos} fallos...`
+        );
+
+        const nombreUsuario = perfil
+          ? `${perfil.nombre} ${perfil.apellido}`.trim()
+          : resultado.nombreActualPlayer || "Participante";
+
+        guardarOActualizarResultadoSesion(
+          sesionDocIdRef.current,
+          user.uid,
+          nombreUsuario,
+          user.email || "",
+          id || "1",
+          escenario.titulo,
+          escenario.categoria,
+          resultado
+        )
+          .then((docId) => {
+            sesionDocIdRef.current = docId;
+            ultimoHashPartida.current = hashEstado;
+            setEstado(
+              `Informe actualizado (${totalAciertos} aciertos / ${totalFallos} fallos).`
+            );
+          })
+          .catch((error) => {
+            console.error("Error guardando resultados:", error);
+            setEstado("No se pudieron guardar los resultados.");
+          })
+          .finally(() => {
+            guardando.current = false;
+          });
+      } catch (error) {
+        console.error("Mensaje de Unity no parseable:", error);
       }
-  
-      window.addEventListener("message", recibirResultados);
-  
-      return () => {
-        window.removeEventListener("message", recibirResultados);
-      };
-    }, [user]);
+    }
 
+    window.addEventListener("message", recibirResultados);
 
-
-
-  const { id } = useParams();
-  const escenario =
-    escenarios[id as unknown as keyof typeof escenarios] ?? escenarios[1];
+    return () => {
+      window.removeEventListener("message", recibirResultados);
+    };
+  }, [user, perfil, id, escenario]);
   return (
     <div className="escenario-page">
 

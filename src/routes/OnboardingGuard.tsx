@@ -21,7 +21,9 @@ export default function OnboardingGuard({ children }: Props) {
     return <p>No se pudo cargar tu perfil.</p>;
   }
 
-  if (perfil.estado !== true) {
+  // El administrador no requiere diligenciar el formulario inicial de participante
+  const esAdmin = perfil.rol?.toLowerCase() === "administrador";
+  if (!esAdmin && perfil.estado !== true) {
     return <Navigate to="/formularioinicial" replace />;
   }
 
