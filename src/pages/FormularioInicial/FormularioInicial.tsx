@@ -107,6 +107,16 @@ function FormularioInicial() {
 
       const datosUpdateUsuario: Record<string, any> = {
         estado: true,
+        edad: Number(edad) || null,
+        genero,
+        escolaridad,
+        ocupacionActual: ocupacionActual.trim(),
+        ocupacionAnterior: ocupacionAnterior.trim(),
+        idiomaMaterno: idiomaMaterno.trim(),
+        ciudad: ciudad.trim(),
+        diagnosticoDificultad: diagnostico,
+        objetivos: objetivosSeleccionados,
+        caracterizacionCompletada: true,
       };
       if (documento.trim()) {
         datosUpdateUsuario.documento = documento.trim();

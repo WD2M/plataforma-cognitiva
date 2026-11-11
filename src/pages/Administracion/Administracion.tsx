@@ -5,6 +5,7 @@ import { cerrarSesion } from "../../services/authService";
 import {
   obtenerTodosLosResultados,
   obtenerPacientesConResultados,
+  coincideBusquedaPaciente,
   type RegistroResultado,
   type PacienteMonitoreo,
 } from "../../services/resultadosService";
@@ -122,16 +123,10 @@ function Administracion() {
     }
   }).length;
 
-  // Filtrar pacientes por nombre o documento
-  const termino = busquedaUsuario.trim().toLowerCase();
-  const pacientesFiltrados = pacientes.filter((p) => {
-    if (!termino) return true;
-    return (
-      p.nombreCompleto.toLowerCase().includes(termino) ||
-      p.documento.toLowerCase().includes(termino) ||
-      p.email.toLowerCase().includes(termino)
-    );
-  });
+  // Filtrar pacientes por nombre o documento usando búsqueda normalizada e insensible a tildes/espacios
+  const pacientesFiltrados = pacientes.filter((p) =>
+    coincideBusquedaPaciente(p, busquedaUsuario)
+  );
 
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -607,21 +602,45 @@ function Administracion() {
                 </Link>
               </div>
 
-              <div style={{ padding: "12px 20px 4px" }}>
-                <input
-                  type="text"
-                  placeholder="🔍 Buscar por nombre o documento..."
-                  value={busquedaUsuario}
-                  onChange={(e) => setBusquedaUsuario(e.target.value)}
-                  style={{
-                    width: "100%",
-                    padding: "9px 12px",
-                    borderRadius: "8px",
-                    border: "1px solid #dcdce8",
-                    fontSize: "12px",
-                    outline: "none",
-                  }}
-                />
+              <div style={{ padding: "12px 20px 8px" }}>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 Buscar por nombre, apellido o documento..."
+                    value={busquedaUsuario}
+                    onChange={(e) => setBusquedaUsuario(e.target.value)}
+                    style={{
+                      flex: 1,
+                      padding: "9px 12px",
+                      borderRadius: "8px",
+                      border: "1px solid #dcdce8",
+                      fontSize: "12px",
+                      outline: "none",
+                    }}
+                  />
+                  {busquedaUsuario && (
+                    <button
+                      type="button"
+                      onClick={() => setBusquedaUsuario("")}
+                      style={{
+                        border: "1px solid #dcdce8",
+                        background: "#f0f1f7",
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        fontSize: "11px",
+                        cursor: "pointer",
+                        fontWeight: 600,
+                      }}
+                    >
+                      Limpiar
+                    </button>
+                  )}
+                </div>
+                {busquedaUsuario.trim() && (
+                  <small style={{ display: "block", marginTop: "5px", color: "#6366f1", fontSize: "11px" }}>
+                    Mostrando {pacientesFiltrados.length} de {pacientes.length} paciente(s)
+                  </small>
+                )}
               </div>
 
               <div className="users-list">

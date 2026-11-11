@@ -1,0 +1,175 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------
+    // AUTENTICACIÓN Y ROLES
+    // ------------------------------------------
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userExists() {
+      return signedIn()
+        && exists(
+          /databases/$(database)/documents/users/$(request.auth.uid)
+        );
+    }
+
+    function currentRole() {
+      return get(
+        /databases/$(database)/documents/users/$(request.auth.uid)
+      ).data.rol;
+    }
+
+    function isAdmin() {
+      return userExists()
+        && currentRole() in ['ADMIN', 'admin', 'ADMINISTRADOR', 'administrador', 'Administrador'];
+    }
+
+    function isInvestigator() {
+      return userExists()
+        && currentRole() in ['INVESTIGADOR', 'investigador', 'Investigador'];
+    }
+
+    function isParticipant() {
+      return userExists()
+        && currentRole() in ['PARTICIPANTE', 'participante', 'Participante'];
+    }
+
+    function isStaff() {
+      return isAdmin() || isInvestigator();
+    }
+
+    // ------------------------------------------
+    // CARACTERIZACIONES (FORMULARIO INICIAL)
+    // ------------------------------------------
+
+    match /caracterizaciones/{userId} {
+      // El participante consulta su propia ficha, y el personal (Admin/Investigador) puede ver todas
+      allow get: if signedIn()
+        && (
+          request.auth.uid == userId
+          || isStaff()
+        );
+
+      // Listar fichas de caracterización para el administrador/investigador
+      allow list: if isStaff();
+
+      // Guardar o actualizar su propia caracterización
+      allow create, update: if signedIn()
+        && request.auth.uid == userId;
+        
+      allow delete: if isAdmin();
+    }
+    
+    // ------------------------------------------
+    // USERS (USUARIOS Y PACIENTES)
+    // ------------------------------------------
+
+    match /users/{userId} {
+
+      // Consultar el perfil propio o, como personal, consultar perfiles
+      allow get: if signedIn()
+        && (
+          request.auth.uid == userId
+          || isStaff()
+        );
+
+      // Listar todos los usuarios para el personal (Admin/Investigador)
+      allow list: if isStaff();
+
+      // Creación de perfil (registro inicial)
+      allow create: if signedIn()
+        && request.auth.uid == userId;
+
+      // Actualización de perfil (propio o por parte del administrador)
+      allow update: if signedIn()
+        && (
+          request.auth.uid == userId
+          || isAdmin()
+        );
+
+      // No permitir que un usuario borre su perfil directamente
+      allow delete: if isAdmin();
+    }
+
+    // ------------------------------------------
+    // ESCENARIOS
+    // ------------------------------------------
+
+    match /escenarios/{scenarioId} {
+      // Lectura para catálogo y actividades
+      allow read: if true;
+
+      // Solo personal autorizado crea o modifica escenarios
+      allow create, update, delete: if isStaff();
+    }
+
+    // ------------------------------------------
+    // SESIONES
+    // ------------------------------------------
+
+    match /sessions/{sessionId} {
+      allow get, list: if isStaff()
+        || (
+          signedIn()
+          && resource.data.userId == request.auth.uid
+        );
+
+      allow create: if signedIn()
+        && request.resource.data.userId == request.auth.uid;
+
+      allow update: if signedIn()
+        && (resource.data.userId == request.auth.uid || isStaff());
+
+      allow delete: if isAdmin();
+    }
+
+    // ------------------------------------------
+    // RESULTADOS DE EVALUACIONES
+    // ------------------------------------------
+    
+    match /resultados/{resultadoId} {
+      allow read: if true;
+      allow create, update, delete: if true;
+    }
+
+    // ------------------------------------------
+    // TESTS COGNITIVOS
+    // ------------------------------------------
+
+    match /cognitive_tests/{testId} {
+      allow get, list: if isStaff()
+        || (
+          signedIn()
+          && resource.data.activo == true
+        );
+
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ------------------------------------------
+    // REPORTES
+    // ------------------------------------------
+
+    match /reports/{reportId} {
+      allow get, list: if isStaff();
+
+      allow create: if isInvestigator()
+        && request.resource.data.createdBy == request.auth.uid;
+
+      allow update, delete: if isAdmin();
+    }
+
+    // ------------------------------------------
+    // DENEGAR COLECCIONES NO CONFIGURADAS
+    // ------------------------------------------
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -42,7 +42,7 @@
 
   padding: 0 25px;
 
-  border-bottom: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .admin-logo {
@@ -83,7 +83,7 @@
 .menu-title {
   margin: 20px 10px 10px;
 
-  color: #747991;
+  color: #797979;
 
   font-size: 9px;
   font-weight: 700;
@@ -132,7 +132,7 @@
 }
 
 .menu-item:hover {
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 255, 255, 0.05);
 
   color: white;
 }
@@ -148,7 +148,7 @@
 
   padding: 20px 15px;
 
-  border-top: 1px solid rgba(255,255,255,0.07);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
 }
 
 .back-home {
@@ -166,19 +166,19 @@
 }
 
 .back-home:hover {
-  background: rgba(255,255,255,0.05);
+  background: rgba(255, 255, 255, 0.05);
 
   color: white;
 }
 
-.exit-button{
+.exit-button {
   background: none;
-  border-color: rgba(255,255,255,0.05);
+  border-color: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
 
 }
 
-.button-exit{
+.button-exit {
   display: block;
 
   padding: 10px;
@@ -887,7 +887,7 @@
     padding: 0;
   }
 
-  .admin-brand > div:last-child,
+  .admin-brand>div:last-child,
   .menu-title,
   .menu-item:not(.active)::after,
   .menu-item {
@@ -932,7 +932,7 @@
     padding: 0 20px;
   }
 
-  .admin-profile > div:last-child {
+  .admin-profile>div:last-child {
     display: none;
   }
 

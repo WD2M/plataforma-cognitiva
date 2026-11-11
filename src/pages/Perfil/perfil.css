@@ -418,15 +418,18 @@
   outline: none;
 }
 
+.admin-search-wrapper {
+  margin-bottom: 20px;
+}
+
 .admin-search-bar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 10px;
+  padding: 8px 12px 8px 16px;
   border: 1px solid #dcdce8;
   border-radius: 12px;
   background: #fafafd;
-  margin-bottom: 20px;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -450,15 +453,110 @@
   outline: none;
 }
 
+.admin-search-btn {
+  border: none;
+  background: #6366f1;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  white-space: nowrap;
+}
+
+.admin-search-btn:hover {
+  background: #4f52d9;
+}
+
 .admin-search-clear {
   border: none;
   background: #eeeeff;
   color: #6366f1;
-  padding: 5px 11px;
-  border-radius: 7px;
+  padding: 7px 12px;
+  border-radius: 8px;
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
+  white-space: nowrap;
+}
+
+.admin-search-clear:hover {
+  background: #e2e4ff;
+}
+
+.admin-search-feedback {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #75798b;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 4px;
+}
+
+.admin-search-feedback strong {
+  color: #202033;
+}
+
+/* Alerta de configuración de permisos en Firebase */
+.admin-permission-alert {
+  background: #fff8eb;
+  border: 1px solid #ffd591;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 22px;
+}
+
+.admin-alert-header {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.admin-alert-icon {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.admin-permission-alert strong {
+  display: block;
+  font-size: 14px;
+  color: #d46b08;
+  margin-bottom: 4px;
+}
+
+.admin-permission-alert p {
+  margin: 0;
+  font-size: 13px;
+  color: #873800;
+  line-height: 1.5;
+}
+
+.admin-rules-toggle {
+  background: none;
+  border: none;
+  color: #d46b08;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 8px;
+  display: inline-block;
+}
+
+.admin-rules-box {
+  margin-top: 10px;
+  background: #202033;
+  color: #e2e8f0;
+  padding: 14px;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 11px;
+  overflow-x: auto;
+  white-space: pre-wrap;
 }
 
 .admin-empty-state {
