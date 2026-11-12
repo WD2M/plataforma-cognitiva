@@ -4,7 +4,8 @@ import { cerrarSesion } from "../../services/authService";
 import { useNavigate } from "react-router-dom";
 import {
   obtenerResultadosUsuario,
-  obtenerPacientesConResultados,
+  obtenerDiagnosticoPacientes,
+  coincideBusquedaPaciente,
   type RegistroResultado,
   type PacienteMonitoreo,
 } from "../../services/resultadosService";
@@ -53,6 +54,8 @@ function Perfil() {
   const [pacientes, setPacientes] = useState<PacienteMonitoreo[]>([]);
   const [cargandoPacientes, setCargandoPacientes] = useState(true);
   const [busqueda, setBusqueda] = useState("");
+  const [errorPermisos, setErrorPermisos] = useState(false);
+  const [mostrarReglas, setMostrarReglas] = useState(false);
   const [pacienteSeleccionado, setPacienteSeleccionado] =
     useState<PacienteMonitoreo | null>(null);
   const [resultadoExpandidoId, setResultadoExpandidoId] = useState<
@@ -80,10 +83,13 @@ function Perfil() {
       if (esAdmin) {
         try {
           setCargandoPacientes(true);
-          const lista = await obtenerPacientesConResultados();
+          const diagnostico = await obtenerDiagnosticoPacientes();
           if (activo) {
-            // Filtramos para mostrar participantes (o todos menos el propio admin si no tiene partidas)
-            setPacientes(lista);
+            setPacientes(diagnostico.pacientes);
+            setErrorPermisos(
+              diagnostico.errorPermisosUsuarios ||
+                diagnostico.errorPermisosCaracterizaciones
+            );
           }
         } catch (err) {
           console.error("Error cargando pacientes para monitoreo:", err);
@@ -183,19 +189,10 @@ function Perfil() {
       return fB - fA;
     });
 
-  // Filtrado por barra de búsqueda (por nombre o por número de documento)
-  const terminoBusqueda = busqueda.trim().toLowerCase();
-  const pacientesFiltrados = soloParticipantes.filter((p) => {
-    if (!terminoBusqueda) return true;
-    const coincideNombre = p.nombreCompleto
-      .toLowerCase()
-      .includes(terminoBusqueda);
-    const coincideDocumento = p.documento
-      .toLowerCase()
-      .includes(terminoBusqueda);
-    const coincideEmail = p.email.toLowerCase().includes(terminoBusqueda);
-    return coincideNombre || coincideDocumento || coincideEmail;
-  });
+  // Filtrado inteligente por barra de búsqueda (por nombre, apellido, documento o correo)
+  const pacientesFiltrados = soloParticipantes.filter((p) =>
+    coincideBusquedaPaciente(p, busqueda)
+  );
 
   const nombreCompleto = perfil
     ? `${perfil.nombre} ${perfil.apellido}`
@@ -468,22 +465,97 @@ function Perfil() {
                 </div>
               </div>
 
-              <div className="admin-search-bar">
-                <span className="admin-search-icon">🔍</span>
-                <input
-                  type="text"
-                  placeholder="Buscar paciente por nombre, apellido o número de documento (C.C. / T.I.)..."
-                  value={busqueda}
-                  onChange={(e) => setBusqueda(e.target.value)}
-                />
-                {busqueda && (
+              {/* Alerta si las reglas de Firestore están bloqueando la lectura de la colección de usuarios */}
+              {errorPermisos && (
+                <div className="admin-permission-alert">
+                  <div className="admin-alert-header">
+                    <span className="admin-alert-icon">⚠️</span>
+                    <div style={{ flex: 1 }}>
+                      <strong>Atención: Restricción de lectura en Firestore detectada</strong>
+                      <p>
+                        Las reglas de seguridad de Firebase actualmente impiden que la cuenta de administrador consulte la lista completa de documentos en <code>users</code> y <code>caracterizaciones</code>. Por esta razón, únicamente se pueden mostrar los pacientes con partidas jugadas.
+                      </p>
+                      <button
+                        type="button"
+                        className="admin-rules-toggle"
+                        onClick={() => setMostrarReglas(!mostrarReglas)}
+                      >
+                        {mostrarReglas ? "▲ Ocultar reglas necesarias" : "▼ Ver reglas requeridas para Firebase Console"}
+                      </button>
+                      {mostrarReglas && (
+                        <pre className="admin-rules-box">
+{`// Copia y pega esto en Firebase Console > Firestore Database > Reglas:
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (request.auth.uid == userId || request.resource.data.rol == 'administrador');
+    }
+    match /caracterizaciones/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /resultados/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /escenarios/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+  }
+}`}
+                        </pre>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="admin-search-wrapper">
+                <form
+                  className="admin-search-bar"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                  }}
+                >
+                  <span className="admin-search-icon">🔍</span>
+                  <input
+                    type="text"
+                    placeholder="Buscar paciente por nombre, apellido o número de documento (C.C. / T.I.)..."
+                    value={busqueda}
+                    onChange={(e) => setBusqueda(e.target.value)}
+                  />
+                  {busqueda && (
+                    <button
+                      type="button"
+                      className="admin-search-clear"
+                      onClick={() => setBusqueda("")}
+                    >
+                      Limpiar
+                    </button>
+                  )}
                   <button
-                    className="admin-search-clear"
-                    onClick={() => setBusqueda("")}
+                    type="submit"
+                    className="admin-search-btn"
                   >
-                    Limpiar
+                    Buscar
                   </button>
-                )}
+                </form>
+
+                <div className="admin-search-feedback">
+                  {busqueda.trim() ? (
+                    <span>
+                      Resultados para "<strong>{busqueda.trim()}</strong>":{" "}
+                      <strong>{pacientesFiltrados.length}</strong> paciente(s) encontrado(s) de{" "}
+                      {soloParticipantes.length} en total.
+                    </span>
+                  ) : (
+                    <span>
+                      Directorio completo: <strong>{soloParticipantes.length}</strong> paciente(s) registrado(s).
+                    </span>
+                  )}
+                </div>
               </div>
 
               {cargandoPacientes ? (
@@ -492,7 +564,18 @@ function Perfil() {
                 </div>
               ) : pacientesFiltrados.length === 0 ? (
                 <div className="admin-empty-state">
-                  No se encontraron pacientes que coincidan con "{busqueda}".
+                  <p>
+                    No se encontraron pacientes que coincidan con "
+                    <strong>{busqueda}</strong>".
+                  </p>
+                  <button
+                    type="button"
+                    className="admin-search-clear"
+                    style={{ marginTop: "10px" }}
+                    onClick={() => setBusqueda("")}
+                  >
+                    Restablecer y ver todos los pacientes
+                  </button>
                 </div>
               ) : (
                 <div className="admin-patients-list">

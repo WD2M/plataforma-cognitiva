@@ -326,16 +326,67 @@ export interface PacienteMonitoreo {
   ultimaFecha: Timestamp | Date | null;
 }
 
-// Obtener directorio completo de pacientes/participantes junto con su caracterización y todos sus resultados detallados
-export async function obtenerPacientesConResultados(): Promise<PacienteMonitoreo[]> {
-  // Ejecutamos cada consulta con su propio manejo de error para que una restricción de permisos en caracterizaciones no bloquee usuarios ni resultados
+export interface DiagnosticoPacientes {
+  pacientes: PacienteMonitoreo[];
+  errorPermisosUsuarios: boolean;
+  errorPermisosCaracterizaciones: boolean;
+}
+
+// Normalización de texto insensible a mayúsculas, tildes y espacios redundantes
+export function normalizarTexto(texto: string): string {
+  if (!texto) return "";
+  return texto
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Comparador inteligente para búsqueda de pacientes por nombre, documento o correo
+export function coincideBusquedaPaciente(
+  paciente: PacienteMonitoreo,
+  termino: string
+): boolean {
+  const normTermino = normalizarTexto(termino);
+  if (!normTermino) return true;
+
+  // 1. Coincidencia por nombre completo
+  const normNombre = normalizarTexto(paciente.nombreCompleto);
+  if (normNombre.includes(normTermino)) return true;
+
+  // 2. Coincidencia por correo
+  const normEmail = normalizarTexto(paciente.email);
+  if (normEmail.includes(normTermino)) return true;
+
+  // 3. Coincidencia por documento numérico sin formato (elimina puntos, espacios y guiones)
+  const docTerminoNumeros = termino.replace(/\D/g, "");
+  const pacDocNumeros = (paciente.documento || "").replace(/\D/g, "");
+  if (docTerminoNumeros.length > 0 && pacDocNumeros.includes(docTerminoNumeros)) {
+    return true;
+  }
+
+  // 4. Coincidencia por documento textual
+  const normDoc = normalizarTexto(paciente.documento);
+  if (normDoc.includes(normTermino)) return true;
+
+  return false;
+}
+
+// Obtener directorio completo de pacientes/participantes con diagnóstico de permisos
+export async function obtenerDiagnosticoPacientes(): Promise<DiagnosticoPacientes> {
+  let errorPermisosUsuarios = false;
+  let errorPermisosCaracterizaciones = false;
+
   const [usersSnap, caractSnap, todosResultados] = await Promise.all([
     getDocs(collection(db, "users")).catch((err) => {
-      console.warn("Error leyendo colección users:", err);
+      console.warn("Aviso Firestore: No se pudo leer la colección 'users' (posible restricción de reglas):", err);
+      errorPermisosUsuarios = true;
       return null;
     }),
     getDocs(collection(db, "caracterizaciones")).catch((err) => {
-      console.warn("Error leyendo colección caracterizaciones:", err);
+      console.warn("Aviso Firestore: No se pudo leer la colección 'caracterizaciones' (posible restricción de reglas):", err);
+      errorPermisosCaracterizaciones = true;
       return null;
     }),
     obtenerTodosLosResultados().catch((err) => {
@@ -374,8 +425,8 @@ export async function obtenerPacientesConResultados(): Promise<PacienteMonitoreo
       const caract = caractMap[uid] || {};
       const misResultados = resultadosPorUid[uid] || [];
 
-      const nombre = data.nombre || "";
-      const apellido = data.apellido || "";
+      const nombre = (data.nombre || "").trim();
+      const apellido = (data.apellido || "").trim();
       const nombreCompleto =
         `${nombre} ${apellido}`.trim() ||
         misResultados[0]?.usuarioNombre ||
@@ -411,13 +462,13 @@ export async function obtenerPacientesConResultados(): Promise<PacienteMonitoreo
         email: data.email || misResultados[0]?.usuarioEmail || "—",
         rol: data.rol || "participante",
         estado: Boolean(data.estado),
-        edad: caract.edad,
-        genero: caract.genero,
-        escolaridad: caract.escolaridad,
-        ciudad: caract.ciudad,
-        ocupacionActual: caract.ocupacionActual,
-        diagnosticoDificultad: caract.diagnosticoDificultad,
-        objetivos: caract.objetivos,
+        edad: data.edad ?? caract.edad,
+        genero: data.genero || caract.genero || "",
+        escolaridad: data.escolaridad || caract.escolaridad || "",
+        ciudad: data.ciudad || caract.ciudad || "",
+        ocupacionActual: data.ocupacionActual || caract.ocupacionActual || "",
+        diagnosticoDificultad: data.diagnosticoDificultad || caract.diagnosticoDificultad || "",
+        objetivos: data.objetivos || caract.objetivos || [],
         resultados: misResultados,
         totalPartidas,
         promedioDesempeno,
@@ -484,7 +535,7 @@ export async function obtenerPacientesConResultados(): Promise<PacienteMonitoreo
   }
 
   // Ordenar: primero los usuarios que tienen partidas jugadas (del que tiene más recientes al más antiguo)
-  return listaPacientes.sort((a, b) => {
+  const pacientesOrdenados = listaPacientes.sort((a, b) => {
     if (b.totalPartidas !== a.totalPartidas) {
       return b.totalPartidas - a.totalPartidas;
     }
@@ -492,4 +543,16 @@ export async function obtenerPacientesConResultados(): Promise<PacienteMonitoreo
     const fB = (b.ultimaFecha as Timestamp)?.toMillis?.() || 0;
     return fB - fA;
   });
+
+  return {
+    pacientes: pacientesOrdenados,
+    errorPermisosUsuarios,
+    errorPermisosCaracterizaciones,
+  };
+}
+
+// Función principal que mantiene retrocompatibilidad
+export async function obtenerPacientesConResultados(): Promise<PacienteMonitoreo[]> {
+  const diagnostico = await obtenerDiagnosticoPacientes();
+  return diagnostico.pacientes;
 }
